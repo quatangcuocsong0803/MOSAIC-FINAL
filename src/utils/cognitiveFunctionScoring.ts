@@ -1,0 +1,276 @@
+// ============================================================
+// Cognitive Function Scoring Engine
+// ============================================================
+// This module is the single source of truth for scoring.
+//
+// Flow:
+//   raw answers (1–5 per question)
+//     → reverse-keyed adjustment
+//     → per-function average scores   (functionScores)
+//     → weighted MBTI type scores     (typeScores)
+//     → compatibility scores          (typeCompatibility)
+//     → ranked outputs                (rankedTypes, functionRanking)
+//
+// IMPORTANT: This is a cognitive-function-first system.
+// MBTI letters are NEVER calculated directly.
+// Type scores are derived solely from function scores.
+// ============================================================
+
+import cognitiveFunctionQuestions from "@/src/data/cognitiveFunctionQuestions";
+import mbtiTypeStacks, {
+  type MbtiTypeCode,
+} from "@/src/data/mbtiTypeStacks";
+import { type CognitiveFunctionCode } from "@/src/data/cognitiveFunctions";
+import {
+  calculateTypeCompatibility,
+  type TypeCompatibilityResult,
+  type TypeStacks,
+  type CognitiveFunction as CompatCognitiveFunction,
+  type MBTIType as CompatMBTIType,
+} from "@/src/utils/typeCompatibility";
+
+// ── Constants ──────────────────────────────────────────────
+
+/** Likert scale bounds. Change here if the scale ever changes. */
+const SCALE_MIN = 1;
+const SCALE_MAX = 5;
+
+/**
+ * Reverse-scoring constant.
+ * Formula: scoredValue = REVERSE_K − answer
+ * At 1–5 scale: REVERSE_K = 6.
+ */
+const REVERSE_K = SCALE_MAX + SCALE_MIN; // 6
+
+/** Stack position weights: dominant=4, aux=3, tertiary=2, inferior=1 */
+const STACK_WEIGHTS: [number, number, number, number] = [4, 3, 2, 1];
+
+// ── Public types ───────────────────────────────────────────
+
+/** Raw answers keyed by question ID, values must be integers 1–5. */
+export type RawAnswers = Record<string, number>;
+
+/** Average score (rounded to 2 dp) for each cognitive function. */
+export type FunctionScores = Record<CognitiveFunctionCode, number>;
+
+/** Weighted composite score (rounded to 2 dp) for each MBTI type. */
+export type TypeScores = Record<MbtiTypeCode, number>;
+
+/** One entry in a ranked list. */
+export interface RankedEntry<T extends string> {
+  id: T;
+  score: number;
+}
+
+/** Full output of a successful scoring run. */
+export interface ScoringResult {
+  /** Average score per cognitive function, rounded to 2 dp. */
+  functionScores: FunctionScores;
+  /** Weighted stack score per MBTI type, rounded to 2 dp. */
+  typeScores: TypeScores;
+  /** All 16 MBTI types sorted highest → lowest. */
+  rankedTypes: RankedEntry<MbtiTypeCode>[];
+  /** The single best-fit MBTI type (from the legacy stack-weight formula). */
+  bestFitType: MbtiTypeCode;
+  /** All 8 cognitive functions sorted highest → lowest. */
+  functionRanking: RankedEntry<CognitiveFunctionCode>[];
+  /**
+   * Results from the cognitive-function-to-MBTI compatibility engine.
+   * Considers both function strength and rank ordering against each
+   * theoretical stack. Use this for richer type-profile matching.
+   */
+  typeCompatibility: TypeCompatibilityResult;
+}
+
+/** Returned when validation fails before any calculation. */
+export interface ValidationError {
+  valid: false;
+  errors: string[];
+}
+
+/** Discriminated union: either a valid result or a validation error. */
+export type ScoringOutput = ScoringResult | ValidationError;
+
+// ── Helpers ────────────────────────────────────────────────
+
+/** Round a number to exactly 2 decimal places. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Sort a scored list highest → lowest (stable). */
+function sortDescending<T extends string>(
+  entries: RankedEntry<T>[],
+): RankedEntry<T>[] {
+  return [...entries].sort((a, b) => b.score - a.score);
+}
+
+// ── Validation ─────────────────────────────────────────────
+
+/**
+ * Validates that:
+ * 1. Every question in the question bank has been answered.
+ * 2. Every answer is an integer within [SCALE_MIN, SCALE_MAX].
+ *
+ * Returns `{ valid: true }` when clean, or `{ valid: false, errors }`.
+ */
+export function validateAnswers(
+  answers: RawAnswers,
+): { valid: true } | ValidationError {
+  const errors: string[] = [];
+  const allIds = cognitiveFunctionQuestions.map((q) => q.id);
+
+  // Check for missing answers
+  const missing = allIds.filter((id) => !(id in answers));
+  if (missing.length > 0) {
+    errors.push(
+      `Missing answers for ${missing.length} question(s): ${missing.join(", ")}.`,
+    );
+  }
+
+  // Check for out-of-range or non-integer values
+  for (const [id, value] of Object.entries(answers)) {
+    if (!Number.isInteger(value)) {
+      errors.push(`Answer for "${id}" is not an integer (got ${value}).`);
+    } else if (value < SCALE_MIN || value > SCALE_MAX) {
+      errors.push(
+        `Answer for "${id}" is out of range (got ${value}; expected ${SCALE_MIN}–${SCALE_MAX}).`,
+      );
+    }
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+}
+
+// ── Step 1 — Function scores ───────────────────────────────
+
+/**
+ * Computes the average scored value for each of the 8 cognitive functions.
+ *
+ * For forward questions:  scoredValue = answer
+ * For reverse questions:  scoredValue = REVERSE_K − answer  (i.e. 6 − answer)
+ *
+ * Assumes answers have already been validated.
+ */
+export function computeFunctionScores(answers: RawAnswers): FunctionScores {
+  const ALL_FUNCTIONS: CognitiveFunctionCode[] = [
+    "Ni", "Ne", "Si", "Se", "Ti", "Te", "Fi", "Fe",
+  ];
+
+  // Accumulate sum and count per function
+  const sums: Partial<Record<CognitiveFunctionCode, number>> = {};
+  const counts: Partial<Record<CognitiveFunctionCode, number>> = {};
+
+  for (const fn of ALL_FUNCTIONS) {
+    sums[fn] = 0;
+    counts[fn] = 0;
+  }
+
+  for (const question of cognitiveFunctionQuestions) {
+    const raw = answers[question.id];
+    const scored = question.reverse ? REVERSE_K - raw : raw;
+    sums[question.function]! += scored;
+    counts[question.function]! += 1;
+  }
+
+  const result = {} as FunctionScores;
+  for (const fn of ALL_FUNCTIONS) {
+    result[fn] = round2(sums[fn]! / counts[fn]!);
+  }
+  return result;
+}
+
+// ── Step 2 — Type scores ───────────────────────────────────
+
+/**
+ * Computes a weighted composite score for each MBTI type using its
+ * function stack:
+ *
+ *   TypeScore = 4 × dominant + 3 × auxiliary + 2 × tertiary + 1 × inferior
+ *
+ * The maximum possible TypeScore = (4+3+2+1) × 5 = 50.
+ */
+export function computeTypeScores(functionScores: FunctionScores): TypeScores {
+  const result = {} as TypeScores;
+
+  for (const [typeCode, typeStack] of Object.entries(mbtiTypeStacks) as [
+    MbtiTypeCode,
+    (typeof mbtiTypeStacks)[MbtiTypeCode],
+  ][]) {
+    const weightedSum = typeStack.stack.reduce((acc, fn, idx) => {
+      return acc + STACK_WEIGHTS[idx] * functionScores[fn];
+    }, 0);
+    result[typeCode] = round2(weightedSum);
+  }
+
+  return result;
+}
+
+// ── Main entry point ───────────────────────────────────────
+
+/**
+ * Score a completed set of answers.
+ *
+ * @param answers - Record mapping every question ID to an integer 1–5.
+ * @returns `ScoringResult` on success, or `ValidationError` on failure.
+ *
+ * @example
+ * ```ts
+ * const result = scoreAnswers(answers);
+ * if ('errors' in result) {
+ *   console.error(result.errors);
+ * } else {
+ *   console.log(result.bestFitType);   // e.g. "INTP"
+ *   console.log(result.functionScores); // { Ni: 2.75, Ne: 4.5, ... }
+ * }
+ * ```
+ */
+export function scoreAnswers(answers: RawAnswers): ScoringOutput {
+  // 1. Validate
+  const validation = validateAnswers(answers);
+  if (!validation.valid) {
+    return validation;
+  }
+
+  // 2. Compute function averages
+  const functionScores = computeFunctionScores(answers);
+
+  // 3. Compute MBTI type scores from function stacks
+  const typeScores = computeTypeScores(functionScores);
+
+  // 4. Rank types
+  const rankedTypes = sortDescending(
+    (Object.entries(typeScores) as [MbtiTypeCode, number][]).map(
+      ([id, score]) => ({ id, score }),
+    ),
+  );
+
+  // 5. Rank functions
+  const functionRanking = sortDescending(
+    (Object.entries(functionScores) as [CognitiveFunctionCode, number][]).map(
+      ([id, score]) => ({ id, score }),
+    ),
+  );
+
+  // 6. Compute profile-to-stack compatibility
+  const compatibilityStacks: TypeStacks = Object.fromEntries(
+    Object.entries(mbtiTypeStacks).map(([type, typeStack]) => [
+      type as CompatMBTIType,
+      typeStack.stack,
+    ]),
+  ) as unknown as TypeStacks;
+
+  const typeCompatibility = calculateTypeCompatibility(
+    functionScores as Record<CompatCognitiveFunction, number>,
+    compatibilityStacks,
+  );
+
+  return {
+    functionScores,
+    typeScores,
+    rankedTypes,
+    bestFitType: rankedTypes[0].id,
+    functionRanking,
+    typeCompatibility,
+  };
+}

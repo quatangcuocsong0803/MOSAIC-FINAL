@@ -1,0 +1,769 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import Link from "next/link";
+
+import RevisionComparison from "@/src/components/discussion/RevisionComparison";
+
+import type {
+  DiscussionReviewStatusData,
+} from "@/lib/discussion/review-status";
+
+function percent(
+  value:
+    number | null,
+) {
+  if (
+    value === null
+  ) {
+    return "—";
+  }
+
+  return `${Math.round(
+    value * 100,
+  )}%`;
+}
+
+function statusTitle(
+  status: string,
+) {
+  if (
+    status ===
+    "APPROVED"
+  ) {
+    return "Bài viết đã được duyệt";
+  }
+
+  if (
+    status ===
+    "REVISION_REQUIRED"
+  ) {
+    return "Bài viết cần chỉnh sửa";
+  }
+
+  if (
+    status ===
+    "REJECTED"
+  ) {
+    return "Bài viết không được duyệt";
+  }
+
+  return "Bài viết đang được kiểm duyệt";
+}
+
+export default function DiscussionReviewStatus({
+  initialData,
+}: {
+  initialData:
+    DiscussionReviewStatusData;
+}) {
+  const [
+    data,
+    setData,
+  ] =
+    useState(
+      initialData,
+    );
+
+  const [
+    retrying,
+    setRetrying,
+  ] =
+    useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (
+      data.moderationStatus !==
+      "REVIEWING"
+    ) {
+      return;
+    }
+
+    let disposed =
+      false;
+
+    async function refresh() {
+      try {
+        const response =
+          await fetch(
+            `/api/discussion/review/${data.id}`,
+            {
+              method:
+                "GET",
+
+              cache:
+                "no-store",
+            },
+          );
+
+        const body =
+          await response.json();
+
+        if (
+          !disposed &&
+          response.ok &&
+          body.success
+        ) {
+          setData(
+            body.data,
+          );
+        }
+      } catch {
+        // Polling failure không làm mất trang.
+      }
+    }
+
+    const timer =
+      window.setInterval(
+        () => {
+          void refresh();
+        },
+        3000,
+      );
+
+    void refresh();
+
+    return () => {
+      disposed =
+        true;
+
+      window.clearInterval(
+        timer,
+      );
+    };
+  }, [
+    data.id,
+    data.moderationStatus,
+  ]);
+
+  const reviewing =
+    data.moderationStatus ===
+    "REVIEWING";
+
+  const approved =
+    data.moderationStatus ===
+    "APPROVED";
+
+  const revision =
+    data.moderationStatus ===
+    "REVISION_REQUIRED";
+
+  const rejected =
+    data.moderationStatus ===
+    "REJECTED";
+
+  async function handleRetry() {
+    setRetrying(
+      true,
+    );
+
+    setError(
+      null,
+    );
+
+    try {
+      const response =
+        await fetch(
+          `/api/discussion/review/${data.id}`,
+          {
+            method:
+              "POST",
+          },
+        );
+
+      const body =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !body.success
+      ) {
+        setError(
+          body.error ||
+            "Không thể retry moderation.",
+        );
+
+        return;
+      }
+
+      const refreshed =
+        await fetch(
+          `/api/discussion/review/${data.id}`,
+          {
+            cache:
+              "no-store",
+          },
+        );
+
+      const refreshedBody =
+        await refreshed.json();
+
+      if (
+        refreshed.ok &&
+        refreshedBody.success
+      ) {
+        setData(
+          refreshedBody.data,
+        );
+      }
+    } catch {
+      setError(
+        "Không thể kết nối tới moderation service.",
+      );
+    } finally {
+      setRetrying(
+        false,
+      );
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <section
+        className={`rounded-xl border p-6 md:p-8 ${
+          approved
+            ? "border-emerald-200 bg-emerald-50/50"
+            : revision
+              ? "border-amber-200 bg-amber-50/60"
+              : rejected
+                ? "border-rose-200 bg-rose-50/50"
+                : "border-[#D8CDBB] bg-white"
+        }`}
+      >
+        <div className="flex items-start gap-4">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg ${
+              approved
+                ? "bg-emerald-100 text-emerald-700"
+                : revision
+                  ? "bg-amber-100 text-amber-700"
+                  : rejected
+                    ? "bg-rose-100 text-rose-700"
+                    : "bg-[#F3EDE3] text-[#735C3D]"
+            }`}
+          >
+            {approved
+              ? "✓"
+              : revision
+                ? "!"
+                : rejected
+                  ? "×"
+                  : "◌"}
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#947E63]">
+              Pre-publication review
+            </p>
+
+            <h1 className="mt-1 font-serif text-2xl font-bold text-[#493A2D]">
+              {statusTitle(
+                data.moderationStatus,
+              )}
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-[#746657]">
+              {reviewing
+                ? "Bạn không cần giữ trang này mở. Bài viết chưa public trong khi MOSAIC kiểm tra relevance, evidence, citations và supporting materials."
+                : data.summary ||
+                  "Quá trình moderation đã hoàn tất."}
+            </p>
+          </div>
+        </div>
+
+        {reviewing && (
+          <div className="mt-5">
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#EAE2D6]">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-[#8B7355]" />
+            </div>
+
+            <p className="mt-2 text-[10px] text-[#968775]">
+              Trạng thái tự cập nhật mỗi 3 giây.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+        <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+          Submission
+        </p>
+
+        <h2 className="mt-2 font-serif text-xl font-bold text-[#4D3D2E]">
+          {data.title}
+        </h2>
+
+        <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-bold uppercase tracking-[0.07em]">
+          <span className="rounded-md bg-[#F3EEE6] px-2 py-1 text-[#745D40]">
+            {data.postKind}
+          </span>
+
+          {data.forum && (
+            <span className="rounded-md bg-[#F5F3EF] px-2 py-1 text-[#786B5D]">
+              {data.forum.name}
+            </span>
+          )}
+
+          <span className="rounded-md bg-[#F5F3EF] px-2 py-1 text-[#786B5D]">
+            Version {data.moderationVersion}
+          </span>
+
+          <span className="rounded-md bg-[#F5F3EF] px-2 py-1 text-[#786B5D]">
+            {data.moderationStatus}
+          </span>
+        </div>
+      </section>
+
+      {data.reasons.length >
+        0 && (
+        <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+            Review findings
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {data.reasons.map(
+              (
+                reason,
+                index,
+              ) => (
+                <div
+                  key={`${index}-${reason}`}
+                  className="flex gap-3 rounded-lg bg-[#FAF8F4] px-3 py-2.5 text-xs leading-5 text-[#66594A]"
+                >
+                  <span className="font-bold text-[#8B7355]">
+                    {index + 1}.
+                  </span>
+
+                  <span>
+                    {reason}
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+
+      {data.review && (
+        <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+            Review dimensions
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg bg-[#FAF8F4] p-3">
+              <p className="text-[9px] text-[#998A77]">
+                Relevance
+              </p>
+
+              <strong className="mt-1 block font-serif text-lg text-[#554431]">
+                {percent(
+                  data.review
+                    .relevanceScore,
+                )}
+              </strong>
+            </div>
+
+            <div className="rounded-lg bg-[#FAF8F4] p-3">
+              <p className="text-[9px] text-[#998A77]">
+                Evidence
+              </p>
+
+              <strong className="mt-1 block font-serif text-lg text-[#554431]">
+                {percent(
+                  data.review
+                    .evidenceScore,
+                )}
+              </strong>
+            </div>
+
+            <div className="rounded-lg bg-[#FAF8F4] p-3">
+              <p className="text-[9px] text-[#998A77]">
+                Citation
+              </p>
+
+              <strong className="mt-1 block font-serif text-lg text-[#554431]">
+                {percent(
+                  data.review
+                    .citationScore,
+                )}
+              </strong>
+            </div>
+
+            <div className="rounded-lg bg-[#FAF8F4] p-3">
+              <p className="text-[9px] text-[#998A77]">
+                Civility
+              </p>
+
+              <strong className="mt-1 block font-serif text-lg text-[#554431]">
+                {percent(
+                  data.review
+                    .civilityScore,
+                )}
+              </strong>
+            </div>
+          </div>
+
+          <p className="mt-3 text-[9px] leading-4 text-[#A09280]">
+            Đây là moderation signals, không phải “điểm đúng khoa học”.
+          </p>
+        </section>
+      )}
+
+      {data.history.length >
+        1 && (
+        <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+                Moderation history
+              </p>
+
+              <h2 className="mt-1 font-serif text-lg font-bold text-[#4D3D2E]">
+                Revision timeline
+              </h2>
+            </div>
+
+            <span className="rounded-md bg-[#F5F1E9] px-2.5 py-1 text-[9px] font-bold text-[#806B51]">
+              {data.history.length} reviews
+            </span>
+          </div>
+
+          <p className="mt-2 text-[10px] leading-5 text-[#8D7F6E]">
+            Mỗi lần gửi lại tạo một moderation record riêng.
+            Review cũ không bị ghi đè bởi revision mới.
+          </p>
+
+          <RevisionComparison
+            history={
+              data.history
+            }
+          />
+
+          <div className="mt-5 space-y-4">
+            {data.history.map(
+              (
+                review,
+                index,
+              ) => {
+                const latest =
+                  index === 0;
+
+                const approvedHistory =
+                  review.decision ===
+                  "APPROVE";
+
+                const revisionHistory =
+                  review.decision ===
+                  "REVISION_REQUIRED";
+
+                return (
+                  <article
+                    key={
+                      review.id
+                    }
+                    className="relative rounded-lg border border-[#E2D9CD] bg-[#FCFBF8] p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 min-w-7 items-center justify-center rounded-full border border-[#CCBDA8] bg-white px-2 text-[9px] font-extrabold text-[#745D40]">
+                          V{
+                            review.moderationVersion
+                          }
+                        </span>
+
+                        <div>
+                          <p className="text-xs font-bold text-[#554432]">
+                            Moderation review
+                            {latest
+                              ? " · latest"
+                              : ""}
+                          </p>
+
+                          <p className="mt-0.5 text-[9px] text-[#A09280]">
+                            {new Date(
+                              review.createdAt,
+                            ).toLocaleString(
+                              "vi-VN",
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`rounded-md px-2.5 py-1 text-[9px] font-extrabold ${
+                          approvedHistory
+                            ? "bg-emerald-50 text-emerald-700"
+                            : revisionHistory
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-rose-50 text-rose-700"
+                        }`}
+                      >
+                        {
+                          review.decision
+                        }
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="rounded-md bg-white px-3 py-2">
+                        <p className="text-[8px] uppercase tracking-[0.08em] text-[#A09280]">
+                          Relevance
+                        </p>
+
+                        <strong className="mt-0.5 block text-xs text-[#5E4B36]">
+                          {percent(
+                            review.relevanceScore,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div className="rounded-md bg-white px-3 py-2">
+                        <p className="text-[8px] uppercase tracking-[0.08em] text-[#A09280]">
+                          Evidence
+                        </p>
+
+                        <strong className="mt-0.5 block text-xs text-[#5E4B36]">
+                          {percent(
+                            review.evidenceScore,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div className="rounded-md bg-white px-3 py-2">
+                        <p className="text-[8px] uppercase tracking-[0.08em] text-[#A09280]">
+                          Citation
+                        </p>
+
+                        <strong className="mt-0.5 block text-xs text-[#5E4B36]">
+                          {percent(
+                            review.citationScore,
+                          )}
+                        </strong>
+                      </div>
+
+                      <div className="rounded-md bg-white px-3 py-2">
+                        <p className="text-[8px] uppercase tracking-[0.08em] text-[#A09280]">
+                          Civility
+                        </p>
+
+                        <strong className="mt-0.5 block text-xs text-[#5E4B36]">
+                          {percent(
+                            review.civilityScore,
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {review.summary && (
+                      <p className="mt-3 text-[10px] leading-5 text-[#776A5A]">
+                        {
+                          review.summary
+                        }
+                      </p>
+                    )}
+
+                    {review.reasons.length >
+                      0 && (
+                      <div className="mt-3 space-y-1.5 border-t border-[#ECE5DA] pt-3">
+                        {review.reasons.map(
+                          (
+                            reason,
+                            reasonIndex,
+                          ) => (
+                            <p
+                              key={`${review.id}-${reasonIndex}`}
+                              className="flex gap-2 text-[9px] leading-4 text-[#837462]"
+                            >
+                              <span className="font-bold text-[#9A8060]">
+                                {
+                                  reasonIndex +
+                                  1
+                                }.
+                              </span>
+
+                              <span>
+                                {
+                                  reason
+                                }
+                              </span>
+                            </p>
+                          ),
+                        )}
+                      </div>
+                    )}
+
+                    <p className="mt-3 border-t border-[#ECE5DA] pt-2 text-[8px] leading-4 text-[#AA9C8B]">
+                      {
+                        review.modelName ||
+                        "Moderation model"
+                      }
+                      {" · "}
+                      {
+                        review.policyVersion
+                      }
+                    </p>
+                  </article>
+                );
+              },
+            )}
+          </div>
+        </section>
+      )}
+
+      {data.citations.length >
+        0 && (
+        <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+            Citations
+          </p>
+
+          <div className="mt-3 divide-y divide-[#EEE7DC]">
+            {data.citations.map(
+              (citation) => (
+                <div
+                  key={
+                    citation.id
+                  }
+                  className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#584938]">
+                      {
+                        citation.title
+                      }
+                    </p>
+
+                    <p className="mt-1 text-[9px] text-[#998B79]">
+                      {
+                        citation.sourceType
+                      }
+                    </p>
+
+                    {citation.verificationNote && (
+                      <p className="mt-1.5 max-w-2xl text-[9px] leading-4 text-[#887968]">
+                        {
+                          citation.verificationNote
+                        }
+                      </p>
+                    )}
+                  </div>
+
+                  <span className="shrink-0 rounded-md bg-[#F6F3EE] px-2 py-1 text-[9px] font-bold text-[#887765]">
+                    {
+                      citation.verificationStatus
+                    }
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+
+      {data.attachments.length >
+        0 && (
+        <section className="rounded-xl border border-[#DED5C7] bg-white p-5">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#917C61]">
+            Supporting materials
+          </p>
+
+          <div className="mt-3 divide-y divide-[#EEE7DC]">
+            {data.attachments.map(
+              (
+                attachment,
+              ) => (
+                <div
+                  key={
+                    attachment.id
+                  }
+                  className="py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="truncate text-xs font-semibold text-[#584938]">
+                      {
+                        attachment.originalName
+                      }
+                    </span>
+
+                    <span className="shrink-0 text-[9px] font-bold text-[#8A7965]">
+                      {
+                        attachment.moderationStatus
+                      }
+                    </span>
+                  </div>
+
+                  {attachment.moderationReason && (
+                    <p className="mt-1 text-[9px] leading-4 text-[#968876]">
+                      {
+                        attachment.moderationReason
+                      }
+                    </p>
+                  )}
+                </div>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/discussion"
+          className="rounded-lg bg-[#685039] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#513D2A]"
+        >
+          {approved
+            ? "Xem Discussion"
+            : "Quay lại Discussion"}
+        </Link>
+
+        {revision && (
+          <Link
+            href={`/discussion/revise/${data.id}`}
+            className="rounded-lg border border-amber-300 bg-amber-50 px-5 py-2.5 text-xs font-bold text-amber-900 transition hover:bg-amber-100"
+          >
+            Chỉnh sửa & gửi lại
+          </Link>
+        )}
+
+        {reviewing && (
+          <button
+            type="button"
+            disabled={
+              retrying ||
+              !data.canRetry
+            }
+            onClick={() =>
+              void handleRetry()
+            }
+            className="rounded-lg border border-[#A48B69] bg-white px-5 py-2.5 text-xs font-bold text-[#70583D] transition hover:bg-[#F4EEE4] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {retrying
+              ? "Đang khởi động lại..."
+              : data.canRetry
+                ? "Retry moderation"
+                : "Moderation đang xử lý"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
