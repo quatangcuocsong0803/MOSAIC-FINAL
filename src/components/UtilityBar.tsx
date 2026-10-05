@@ -158,7 +158,13 @@ function formatRelativeTime(value: string) {
 export default function UtilityBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
+  const accountId = user?.id;
+  const accountRef = useRef(accountId);
+  accountRef.current = accountId;
+  const countsBusy = useRef<string | undefined>(undefined);
+  const notificationOpenRef = useRef(false);
+
 
   const dropdownRef =
     useRef<HTMLDivElement>(null);
@@ -188,6 +194,8 @@ export default function UtilityBar() {
   const [notifications, setNotifications] =
     useState<NotificationItem[]>([]);
 
+  notificationOpenRef.current = notificationOpen;
+
   useLayoutEffect(() => {
     if (!notificationOpen) return;
     const position = () => {
@@ -212,19 +220,18 @@ export default function UtilityBar() {
         return;
       }
 
-      const result =
-        await getUtilityCounts();
-
-      if (result.success) {
-        setUnreadNotifications(
-          result.unreadNotifications,
-        );
-
-        setUnreadMessages(
-          result.unreadMessages,
-        );
-      }
-    }, [isSignedIn]);
+      if(countsBusy.current===accountId)return;
+      countsBusy.current=accountId;
+      const requestedAccount=accountId;
+      try {
+        const result=await getUtilityCounts();
+        if(result.success && requestedAccount===accountRef.current){
+          setUnreadNotifications(result.unreadNotifications);
+          setUnreadMessages(result.unreadMessages);
+        }
+      } catch { /* Keep the most recent successful counts. */ }
+      finally { if(countsBusy.current===requestedAccount)countsBusy.current=undefined; }
+    }, [isSignedIn, accountId]);
 
   const loadNotifications =
     useCallback(async () => {
@@ -232,13 +239,14 @@ export default function UtilityBar() {
         return;
       }
 
+      const requestedAccount=accountId;
       setNotificationLoading(true);
 
       try {
       const result =
         await getNotifications();
 
-      if (result.success) {
+      if (result.success && requestedAccount===accountRef.current) {
         setNotifications(
           result.notifications as NotificationItem[],
         );
@@ -249,33 +257,22 @@ export default function UtilityBar() {
       }
 
       } catch (error) { console.error("Không thể tải thông báo:", error); } finally { setNotificationLoading(false); }
-    }, [isSignedIn]);
+    }, [isSignedIn, accountId]);
 
   useEffect(() => {
-    if (!isSignedIn) {
-      return;
-    }
-
-    void loadCounts();
-
-    const interval =
-      window.setInterval(() => {
-        void loadCounts();
-
-        if (notificationOpen) {
-          void loadNotifications();
-        }
-      }, 20_000);
-
-    return () =>
-      window.clearInterval(interval);
-  }, [
-    isSignedIn,
-    pathname,
-    notificationOpen,
-    loadCounts,
-    loadNotifications,
-  ]);
+    setUnreadNotifications(0);setUnreadMessages(0);setNotifications([]);setNotificationOpen(false);
+    if(!isSignedIn || !accountId)return;
+    const refresh=()=>{
+      if(document.visibilityState==='hidden')return;
+      void loadCounts();
+      if(notificationOpenRef.current)void loadNotifications();
+    };
+    refresh();
+    const interval=window.setInterval(refresh,20_000);
+    document.addEventListener('visibilitychange',refresh);
+    window.addEventListener('mosaic:utility-refresh',refresh);
+    return ()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('mosaic:utility-refresh',refresh)};
+  }, [isSignedIn, accountId, loadCounts, loadNotifications]);
 
   useEffect(() => {
     if (!notificationOpen) {

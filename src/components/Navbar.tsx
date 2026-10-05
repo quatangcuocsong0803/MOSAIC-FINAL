@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import styles from "./Navbar.module.css";
 import { SignOutButton, useUser } from "@clerk/nextjs";
-import { getUserProfile } from "@/app/actions/profile";
+import { getNavigationAvatar } from "@/app/actions/navigation";
 import { AVATAR_UPDATED_EVENT } from "@/lib/avatar-events";
 import UtilityBar from "./UtilityBar";
 import DiscussionDropdown, { discussionLinks } from "./DiscussionDropdown";
@@ -43,32 +43,25 @@ export default function Navbar() {
     media.addEventListener("change", onResize);
     return () => { window.removeEventListener("keydown", onKey); media.removeEventListener("change", onResize); };
   }, [open]);
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
+  const accountId = user?.id;
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isSignedIn) {
-      setAvatarUrl(null);
-      return;
-    }
-
-    const loadAvatar = () => {
-      getUserProfile().then((res) => {
-        setAvatarUrl(res.success ? res.profile?.avatarUrl ?? null : null);
-      });
+    let alive=true;let revision=0;
+    setAvatarUrl(null);
+    if(!isSignedIn || !accountId)return;
+    const loadAvatar=async()=>{
+      const request=++revision;
+      try{const result=await getNavigationAvatar();if(alive&&request===revision&&result.success)setAvatarUrl(result.avatarUrl);}catch{}
     };
-
-    // Nhận URL mới ngay lập tức khi trang khác upload xong avatar
-    const onAvatarUpdated = (e: Event) => {
-      const url = (e as CustomEvent<string | null>).detail;
-      if (url !== undefined) setAvatarUrl(url);
-      else loadAvatar();
+    const onAvatarUpdated=(event:Event)=>{
+      const url=(event as CustomEvent<string|null>).detail;
+      if(url!==undefined){++revision;setAvatarUrl(url);}else void loadAvatar();
     };
-
-    loadAvatar();
-    window.addEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
-    return () => window.removeEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
-  }, [isSignedIn, pathname]);
+    void loadAvatar();window.addEventListener(AVATAR_UPDATED_EVENT,onAvatarUpdated);
+    return ()=>{alive=false;window.removeEventListener(AVATAR_UPDATED_EVENT,onAvatarUpdated)};
+  }, [isSignedIn, accountId]);
 
   function isActive(href: string) {
     if (href === "/") {

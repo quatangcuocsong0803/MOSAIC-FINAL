@@ -1,4 +1,5 @@
 "use server";
+import {unstable_cache,revalidateTag} from 'next/cache';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { knowledgePages } from '@/lib/search/knowledge-pages';
@@ -8,8 +9,9 @@ export async function recordKnowledgeSearch(query:string) {
  const {userId}=await auth();if(!userId)return;
  const match=findPages(query).find(p=>p.href.startsWith('/knowledge/'));if(!match)return;
  const day=new Date().toISOString().slice(0,10);
- try{await prisma.knowledgeSearchDaily.upsert({where:{clerkId_href_day:{clerkId:userId,href:match.href,day}},create:{clerkId:userId,href:match.href,day},update:{}});}catch{}
+ try{await prisma.knowledgeSearchDaily.upsert({where:{clerkId_href_day:{clerkId:userId,href:match.href,day}},create:{clerkId:userId,href:match.href,day},update:{}});revalidateTag("mosaic-knowledge-popular");}catch{}
 }
-export async function popularKnowledge(){
- try{ const groups=await prisma.knowledgeSearchDaily.groupBy({by:['href'],_count:{href:true},orderBy:{_count:{href:'desc'}},take:8});return groups.flatMap(g=>{const page=knowledgePages.find(p=>p.href===g.href);return page?[{label:page.label,href:page.href,count:g._count.href}]:[];});}catch{return [];}
-}
+const readPopularKnowledge=unstable_cache(async()=>{
+ try{ const groups=await prisma.knowledgeSearchDaily.groupBy({by:['href'],_count:{href:true},orderBy:{_count:{href:'desc'}},take:8});return groups.flatMap(g=>{const page=knowledgePages.find(p=>p.href===g.href);return page?[{label:page.label,href:page.href,count:g._count.href}]:[];});}catch{throw new Error('Knowledge popularity unavailable');}
+},['mosaic-knowledge-popular-v1'],{revalidate:60,tags:['mosaic-knowledge-popular']});
+export async function popularKnowledge(){try{return await readPopularKnowledge();}catch{return [];}}

@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { usePathname } from 'next/navigation';
 import { getUserSettings } from '@/app/actions/settings';
 import { defaultPreferences, SETTINGS_EVENT, type SettingsSnapshot } from '@/lib/settings/preferences';
 export function announceSettings(userId: string, settings: SettingsSnapshot) {
@@ -10,7 +9,6 @@ export function announceSettings(userId: string, settings: SettingsSnapshot) {
 }
 export default function DisplayPreferences() {
   const { user, isLoaded } = useUser();
-  const pathname = usePathname();
   const userId = user?.id;
   const previousUserId = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -42,6 +40,6 @@ export default function DisplayPreferences() {
     window.addEventListener(SETTINGS_EVENT, onSaved);
     window.addEventListener('storage', onStorage);
     return () => { alive = false; window.removeEventListener(SETTINGS_EVENT, onSaved); window.removeEventListener('storage', onStorage); };
-  }, [userId, isLoaded, pathname]);
+  }, [userId, isLoaded]);
   return null;
 }

@@ -8,8 +8,8 @@
   min-height: 100vh;
   padding: 54px 20px 96px;
   background:
-    linear-gradient(rgba(248, 245, 238, 0.48), rgba(248, 245, 238, 0.48)),
-    url('/figma-home/background.png') center top / cover repeat-y;
+    linear-gradient(rgba(248, 245, 238, 0.28), rgba(248, 245, 238, 0.28)),
+    url('/home/background-tile.jpg') center top / auto calc(100% / 7.2) repeat;
   color: var(--ink);
   font-family: "Cormorant Garamond", Georgia, serif;
 }
@@ -471,3 +471,6 @@
   .tocLink,.tocSubLink { min-height:44px; display:flex; align-items:center; }
   .quote { padding:18px; font-size:23px; }
 }
+
+/* Match the homepage decoration preference. */
+:global(html[data-show-decorations="false"]) .page { background:#f8f5ee; }

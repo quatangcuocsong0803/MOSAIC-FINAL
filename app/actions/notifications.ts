@@ -68,19 +68,10 @@ export async function getUtilityCounts() {
       };
     }
 
-    const friendIds =
-      await getAcceptedFriendIds(
-        currentUser.id,
-      );
-
-    const unreadNotifications =
-      await prisma.notification.count({
-        where: {
-          recipientId:
-            currentUser.id,
-          isRead: false,
-        },
-      });
+    const [friendIds, unreadNotifications] = await Promise.all([
+      getAcceptedFriendIds(currentUser.id),
+      prisma.notification.count({where:{recipientId:currentUser.id,isRead:false}}),
+    ]);
 
     const unreadMessages =
       friendIds.length === 0
