@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USER
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  username  String?  @unique
+  createdAt DateTime @default(now())
+
+  // Thông tin profile
+  dateOfBirth DateTime?
+  zodiacSign  String?
+  hobbies     String?
+  location    String?
+  bio         String?
+  avatarUrl   String?
+
+  // Một user có thể có nhiều kết quả test
+  testResults TestResult[]
+
+  // Quan hệ bạn bè
+  sentRequests     Friendship[] @relation("SentFriendRequests")
+  receivedRequests Friendship[] @relation("ReceivedFriendRequests")
+}
+
+// ============================================================
+// FRIENDSHIP
+// ============================================================
+
+model Friendship {
+  id         String @id @default(cuid())
+
+  senderId   String
+  sender     User @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([senderId, receiverId])
+}
+
+// ============================================================
+// TEST RESULT
+// ============================================================
+
+// Consent là riêng cho từng kết quả test.
+//
+// Nếu statisticsConsent = false:
+// - user vẫn xem được kết quả;
+// - kết quả vẫn có thể được tính vào tổng số người/lượt làm test;
+// - kết quả KHÔNG được kết hợp với dữ liệu profile để filter
+//   hoặc phân tích Statistics.
+//
+// Nếu statisticsConsent = true:
+// - kết quả có thể được dùng trong Statistics tổng hợp;
+// - có thể kết hợp với các field profile được whitelist;
+// - không có nghĩa là kết quả/profile được công khai cho người khác.
+model TestResult {
+  id     String @id @default(cuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Nhóm bài test.
+  //
+  // Ví dụ:
+  // "MBTI"
+  // "ENNEAGRAM"
+  //
+  // Statistics có thể group theo testType để gộp
+  // Traditional và AI Adaptive chung một nhóm.
+  testType String
+
+  // Biến thể bài test.
+  //
+  // Cognitive Functions:
+  // "TRADITIONAL_72"
+  // "AI_ADAPTIVE"
+  //
+  // Enneagram:
+  // "TRADITIONAL"
+  //
+  // Optional để dữ liệu cũ không bị lỗi.
+  testVariant String?
+
+  // Kết quả cuối cùng.
+  //
+  // Ví dụ:
+  // "INTJ"
+  // "ENTP"
+  // "Type 5w4"
+  resultName String
+
+  // Thông tin bổ sung nếu cần.
+  //
+  // Không lưu raw open-ended AI answers ở đây.
+  details String?
+
+  // ==========================================================
+  // STATISTICS CONSENT
+  // ==========================================================
+
+  // User có đồng ý cho kết quả test này được kết hợp
+  // với các thông tin profile phù hợp để phục vụ
+  // Statistics tổng hợp / filter hay không.
+  //
+  // Không bao giờ được tick sẵn.
+  statisticsConsent Boolean @default(false)
+
+  // Version của nội dung consent mà user đã thấy.
+  //
+  // Ví dụ:
+  // "stats-consent-v1"
+  statisticsConsentVersion String?
+
+  // Thời điểm user đồng ý.
+  statisticsConsentedAt DateTime?
+
+  // Thời điểm user thu hồi consent.
+  statisticsConsentRevokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([testType])
+  @@index([testType, statisticsConsent])
+  @@index([userId, createdAt])
+}
+
+// ============================================================
+// DISCUSSION POST
+// ============================================================
+
+model Post {
+  id             String   @id @default(cuid())
+  title          String
+  content        String
+  authorId       String
+  authorName     String
+  authorImage    String?
+  personalityTag String
+  likesCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  comments Comment[]
+  likes    Like[]
+}
+
+// ============================================================
+// COMMENT
+// ============================================================
+
+model Comment {
+  id      String @id @default(cuid())
+
+  content String
+
+  postId  String
+  post    Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  authorId    String
+  authorName  String
+  authorImage String?
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// LIKE
+// ============================================================
+
+model Like {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}

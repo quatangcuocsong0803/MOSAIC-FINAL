@@ -1,0 +1,1113 @@
+"use client";
+
+import {
+  useMemo,
+  useState,
+} from "react";
+import Link from "next/link";
+
+import AttachmentUploader from "@/src/components/discussion/AttachmentUploader";
+
+import {
+  resubmitDiscussionPost,
+} from "@/app/actions/discussion-revision";
+
+import {
+  CITATION_SOURCE_TYPES,
+  getMinimumCitationCount,
+  getMinimumContentLength,
+  POST_KIND_DESCRIPTIONS,
+  POST_KIND_LABELS,
+  SOURCE_TYPE_LABELS,
+  type DiscussionCitationSourceType,
+  type DiscussionForumPolicy,
+  type DiscussionPostKind,
+} from "@/lib/discussion/post-policy";
+
+type ForumOption = {
+  id: string;
+  name: string;
+  description: string;
+  moderationPolicy:
+    DiscussionForumPolicy;
+};
+
+type CitationDraft = {
+  id: string;
+
+  title: string;
+  authors: string;
+  year: string;
+  publisher: string;
+
+  url: string;
+  doi: string;
+
+  sourceType:
+    DiscussionCitationSourceType;
+};
+
+type ExistingRevisionAttachment = {
+  id: string;
+  originalName: string;
+  kind: string;
+  sizeBytes: number;
+  scanStatus: string;
+  moderationStatus: string;
+  moderationReason: string | null;
+};
+
+type RevisionInitialData = {
+  postId: string;
+
+  forumId: string;
+
+  postKind:
+    DiscussionPostKind;
+
+  title: string;
+  content: string;
+
+  personalityTag: string;
+
+  citations:
+    CitationDraft[];
+
+  attachments:
+    ExistingRevisionAttachment[];
+};
+
+function makeCitation():
+  CitationDraft {
+  return {
+    id:
+      crypto.randomUUID(),
+
+    title: "",
+    authors: "",
+    year: "",
+    publisher: "",
+
+    url: "",
+    doi: "",
+
+    sourceType:
+      "PEER_REVIEWED",
+  };
+}
+
+export default function DiscussionRevisionComposer({
+  forums,
+  uploadSessionId,
+  initialData,
+}: {
+  forums: ForumOption[];
+  uploadSessionId: string;
+  initialData: RevisionInitialData;
+}) {
+  const [forumId, setForumId] =
+    useState(
+      forums.some(
+        (forum) =>
+          forum.id ===
+          initialData.forumId,
+      )
+        ? initialData.forumId
+        : forums[0]?.id || "",
+    );
+
+  const [
+    postKind,
+    setPostKind,
+  ] =
+    useState<DiscussionPostKind>(
+      initialData.postKind,
+    );
+
+  const [title, setTitle] =
+    useState(
+      initialData.title,
+    );
+
+  const [content, setContent] =
+    useState(
+      initialData.content,
+    );
+
+  const [
+    personalityTag,
+    setPersonalityTag,
+  ] = useState(
+    initialData.personalityTag,
+  );
+
+  const [
+    citations,
+    setCitations,
+  ] = useState<
+    CitationDraft[]
+  >(
+    initialData.citations,
+  );
+
+  const [
+    attachmentIds,
+    setAttachmentIds,
+  ] = useState<string[]>([]);
+
+  const [
+    retainedAttachmentIds,
+    setRetainedAttachmentIds,
+  ] = useState<string[]>(
+    initialData.attachments.map(
+      (attachment) =>
+        attachment.id,
+    ),
+  );
+
+  const [
+    attachmentsBusy,
+    setAttachmentsBusy,
+  ] = useState(false);
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    submittedPostId,
+    setSubmittedPostId,
+  ] = useState<
+    string | null
+  >(null);
+
+  const selectedForum =
+    forums.find(
+      (forum) =>
+        forum.id === forumId,
+    ) ?? null;
+
+  const minimumCitations =
+    selectedForum
+      ? getMinimumCitationCount(
+          postKind,
+          selectedForum.moderationPolicy,
+        )
+      : 0;
+
+  const minimumContent =
+    getMinimumContentLength(
+      postKind,
+    );
+
+  const citationValidity =
+    useMemo(() => {
+      return citations.every(
+        (citation) =>
+          citation.title
+            .trim()
+            .length >= 4 &&
+          Boolean(
+            citation.url.trim() ||
+              citation.doi.trim(),
+          ),
+      );
+    }, [citations]);
+
+  const canSubmit =
+    Boolean(forumId) &&
+    title.trim().length >= 12 &&
+    content.trim().length >=
+      minimumContent &&
+    citations.length >=
+      minimumCitations &&
+    citationValidity &&
+    retainedAttachmentIds.length +
+      attachmentIds.length <=
+      8 &&
+    !attachmentsBusy &&
+    !submitting;
+
+  function updateCitation(
+    id: string,
+    patch:
+      Partial<CitationDraft>,
+  ) {
+    setCitations(
+      (current) =>
+        current.map(
+          (citation) =>
+            citation.id === id
+              ? {
+                  ...citation,
+                  ...patch,
+                }
+              : citation,
+        ),
+    );
+  }
+
+  function removeCitation(
+    id: string,
+  ) {
+    setCitations(
+      (current) =>
+        current.filter(
+          (citation) =>
+            citation.id !== id,
+        ),
+    );
+  }
+
+  async function handleSubmit(
+    event:
+      React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (
+      !canSubmit ||
+      !selectedForum
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const result =
+      await resubmitDiscussionPost({
+        postId:
+          initialData.postId,
+
+        forumId,
+        postKind,
+        title,
+        content,
+        personalityTag,
+
+        retainedAttachmentIds,
+
+        uploadSessionId,
+
+        newAttachmentIds:
+          attachmentIds,
+
+        citations:
+          citations.map(
+            ({
+              id: _id,
+              ...citation
+            }) => citation,
+          ),
+      });
+
+    if (!result.success) {
+      setError(
+        result.error,
+      );
+
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmittedPostId(
+      result.postId,
+    );
+
+    setSubmitting(false);
+
+    // Full navigation có chủ ý để tránh stale client bundle.
+    window.location.assign(
+      `/discussion/review/${result.postId}`,
+    );
+
+    return;
+  }
+
+  if (submittedPostId) {
+    return (
+      <div className="rounded-xl border border-[#D8CDBB] bg-white p-8 md:p-10">
+        <div className="mx-auto max-w-xl text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#C7B899] bg-[#F6F1E8] text-lg text-[#6A553B]">
+            ✓
+          </div>
+
+          <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#987F61]">
+            Revision submitted
+          </p>
+
+          <h2 className="mt-2 font-serif text-2xl font-bold text-[#493A2D]">
+            Revision đang được kiểm duyệt
+          </h2>
+
+          <p className="mt-3 text-sm leading-6 text-[#746757]">
+            Bài chưa được xuất bản công khai.
+            Hệ thống moderation sẽ kiểm tra mức độ liên quan,
+            citations, evidence và cách trình bày claim trước
+            khi quyết định publication status.
+          </p>
+
+          <p className="mt-4 font-mono text-[10px] text-[#A29483]">
+            {submittedPostId}
+          </p>
+
+          <Link
+            href="/discussion"
+            className="mt-6 inline-flex rounded-lg bg-[#6F593D] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#58452F]"
+          >
+            Quay lại Discussion
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={
+        handleSubmit
+      }
+      className="space-y-5"
+    >
+      {/* ====================================================
+          CLASSIFICATION
+      ==================================================== */}
+      <section className="rounded-xl border border-[#DED5C7] bg-white">
+        <header className="border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#917C61]">
+            01 · Classification
+          </p>
+
+          <h2 className="mt-1 font-serif text-lg font-bold text-[#493A2D]">
+            Bài viết này thuộc loại nào?
+          </h2>
+        </header>
+
+        <div className="space-y-5 p-5">
+          <div>
+            <label className="mb-2 block text-xs font-bold text-[#5D4C39]">
+              System forum
+            </label>
+
+            <select
+              value={forumId}
+              onChange={(event) =>
+                setForumId(
+                  event.target.value,
+                )
+              }
+              className="w-full rounded-lg border border-[#D9CDBD] bg-white px-3.5 py-3 text-sm text-[#514335] outline-none focus:border-[#8B7355]"
+            >
+              {forums.map(
+                (forum) => (
+                  <option
+                    key={forum.id}
+                    value={forum.id}
+                  >
+                    {forum.name}
+                  </option>
+                ),
+              )}
+            </select>
+
+            {selectedForum && (
+              <div className="mt-2 rounded-lg bg-[#F8F5EF] px-3.5 py-3">
+                <p className="text-xs leading-5 text-[#756857]">
+                  {
+                    selectedForum.description
+                  }
+                </p>
+
+                <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-[#9A856B]">
+                  {
+                    selectedForum.moderationPolicy
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold text-[#5D4C39]">
+              Evidence category
+            </label>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                Object.keys(
+                  POST_KIND_LABELS,
+                ) as DiscussionPostKind[]
+              ).map(
+                (kind) => {
+                  const selected =
+                    postKind ===
+                    kind;
+
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() =>
+                        setPostKind(
+                          kind,
+                        )
+                      }
+                      className={`rounded-lg border p-3.5 text-left transition ${
+                        selected
+                          ? "border-[#8B7355] bg-[#F4EEE4]"
+                          : "border-[#E2D8CA] bg-white hover:bg-[#FAF8F4]"
+                      }`}
+                    >
+                      <strong className="text-[11px] text-[#544330]">
+                        {
+                          POST_KIND_LABELS[
+                            kind
+                          ]
+                        }
+                      </strong>
+
+                      <p className="mt-1.5 text-[10px] leading-4 text-[#817362]">
+                        {
+                          POST_KIND_DESCRIPTIONS[
+                            kind
+                          ]
+                        }
+                      </p>
+                    </button>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====================================================
+          ARTICLE
+      ==================================================== */}
+      <section className="rounded-xl border border-[#DED5C7] bg-white">
+        <header className="border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#917C61]">
+            02 · Article
+          </p>
+
+          <h2 className="mt-1 font-serif text-lg font-bold text-[#493A2D]">
+            Trình bày lập luận
+          </h2>
+        </header>
+
+        <div className="space-y-4 p-5">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold text-[#5D4C39]">
+                Tiêu đề
+              </label>
+
+              <span className="text-[9px] text-[#A09280]">
+                {title.length}/180
+              </span>
+            </div>
+
+            <input
+              value={title}
+              onChange={(event) =>
+                setTitle(
+                  event.target.value,
+                )
+              }
+              maxLength={180}
+              placeholder="Một tiêu đề mô tả rõ câu hỏi hoặc luận điểm..."
+              className="w-full rounded-lg border border-[#D9CDBD] px-4 py-3 text-sm font-medium text-[#493A2D] outline-none focus:border-[#8B7355]"
+            />
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold text-[#5D4C39]">
+                Nội dung
+              </label>
+
+              <span
+                className={`text-[9px] ${
+                  content.trim()
+                    .length <
+                  minimumContent
+                    ? "text-[#A88662]"
+                    : "text-[#7C8B6B]"
+                }`}
+              >
+                {content.trim()
+                  .length}
+                /
+                {minimumContent}+
+              </span>
+            </div>
+
+            <textarea
+              value={content}
+              onChange={(event) =>
+                setContent(
+                  event.target
+                    .value,
+                )
+              }
+              maxLength={15000}
+              rows={13}
+              placeholder="Trình bày claim, lập luận, giới hạn và cơ sở của cách diễn giải. Nếu đang đưa ra empirical claim, hãy tránh trình bày association như causation..."
+              className="w-full resize-y rounded-lg border border-[#D9CDBD] px-4 py-3 text-[13px] leading-6 text-[#554A3E] outline-none focus:border-[#8B7355]"
+            />
+
+            <p className="mt-2 text-[10px] leading-4 text-[#988B7A]">
+              Citation ở bước dưới không thay thế cho lập luận.
+              Hãy giải thích rõ nguồn hỗ trợ claim nào và phần nào
+              là interpretation của chính bạn.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold text-[#5D4C39]">
+              Typology tag
+            </label>
+
+            <input
+              value={
+                personalityTag
+              }
+              onChange={(event) =>
+                setPersonalityTag(
+                  event.target
+                    .value,
+                )
+              }
+              maxLength={40}
+              placeholder="Ví dụ: Jung, MBTI, Ni, Enneagram 5..."
+              className="w-full rounded-lg border border-[#D9CDBD] px-4 py-3 text-sm text-[#554A3E] outline-none focus:border-[#8B7355]"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ====================================================
+          CITATIONS
+      ==================================================== */}
+      <section className="rounded-xl border border-[#DED5C7] bg-white">
+        <header className="flex items-start justify-between gap-4 border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
+          <div>
+            <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#917C61]">
+              03 · References
+            </p>
+
+            <h2 className="mt-1 font-serif text-lg font-bold text-[#493A2D]">
+              Citations
+            </h2>
+
+            <p className="mt-1 text-[10px] text-[#897A68]">
+              Yêu cầu tối thiểu:{" "}
+              <strong>
+                {minimumCitations}
+              </strong>{" "}
+              nguồn.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={
+              citations.length >=
+              12
+            }
+            onClick={() =>
+              setCitations(
+                (current) => [
+                  ...current,
+                  makeCitation(),
+                ],
+              )
+            }
+            className="shrink-0 rounded-lg border border-[#9B8464] px-3 py-2 text-[10px] font-bold text-[#705A3E] transition hover:bg-[#F2ECE2] disabled:opacity-40"
+          >
+            + Add source
+          </button>
+        </header>
+
+        <div className="p-5">
+          {citations.length ===
+          0 ? (
+            <div
+              className={`rounded-lg border border-dashed p-6 text-center ${
+                minimumCitations >
+                0
+                  ? "border-[#CFAFA1] bg-[#FCF8F5]"
+                  : "border-[#DDD3C5] bg-[#FAF9F6]"
+              }`}
+            >
+              <p className="text-xs font-semibold text-[#725F49]">
+                {minimumCitations >
+                0
+                  ? "Bài này chưa đủ citation để gửi."
+                  : "Citation không bắt buộc cho loại bài này."}
+              </p>
+
+              <p className="mt-1 text-[10px] text-[#9B8B79]">
+                Thêm nguồn vẫn được khuyến khích khi bạn dẫn
+                theory hoặc factual claim.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {citations.map(
+                (
+                  citation,
+                  index,
+                ) => (
+                  <article
+                    key={
+                      citation.id
+                    }
+                    className="rounded-lg border border-[#DDD3C5] bg-[#FCFBF8]"
+                  >
+                    <header className="flex items-center justify-between border-b border-[#E8E1D6] px-4 py-3">
+                      <strong className="font-serif text-sm text-[#5D4933]">
+                        Source [
+                        {index + 1}]
+                      </strong>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeCitation(
+                            citation.id,
+                          )
+                        }
+                        className="text-[10px] font-bold text-rose-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </header>
+
+                    <div className="grid gap-3 p-4 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          Tên tài liệu *
+                        </label>
+
+                        <input
+                          value={
+                            citation.title
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                title:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="Tên paper, sách, chapter hoặc trang tài liệu..."
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#8B7355]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          Loại nguồn *
+                        </label>
+
+                        <select
+                          value={
+                            citation.sourceType
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                sourceType:
+                                  event
+                                    .target
+                                    .value as DiscussionCitationSourceType,
+                              },
+                            )
+                          }
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        >
+                          {CITATION_SOURCE_TYPES.map(
+                            (
+                              type,
+                            ) => (
+                              <option
+                                key={
+                                  type
+                                }
+                                value={
+                                  type
+                                }
+                              >
+                                {
+                                  SOURCE_TYPE_LABELS[
+                                    type
+                                  ]
+                                }
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          Năm
+                        </label>
+
+                        <input
+                          inputMode="numeric"
+                          value={
+                            citation.year
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                year:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="2024"
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          Tác giả
+                        </label>
+
+                        <input
+                          value={
+                            citation.authors
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                authors:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="C. G. Jung; ..."
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          Publisher / Journal
+                        </label>
+
+                        <input
+                          value={
+                            citation.publisher
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                publisher:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="Journal / Publisher"
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          URL
+                        </label>
+
+                        <input
+                          type="url"
+                          value={
+                            citation.url
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                url:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="https://..."
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold text-[#74614C]">
+                          DOI
+                        </label>
+
+                        <input
+                          value={
+                            citation.doi
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateCitation(
+                              citation.id,
+                              {
+                                doi:
+                                  event
+                                    .target
+                                    .value,
+                              },
+                            )
+                          }
+                          placeholder="10.xxxx/..."
+                          className="w-full rounded-md border border-[#DDD3C5] bg-white px-3 py-2.5 text-xs outline-none"
+                        />
+                      </div>
+
+                      {!citation.url.trim() &&
+                        !citation.doi.trim() && (
+                          <p className="sm:col-span-2 text-[9px] font-semibold text-amber-700">
+                            Cần ít nhất URL hoặc DOI.
+                          </p>
+                        )}
+                    </div>
+                  </article>
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ====================================================
+          SUPPORTING MATERIALS
+      ==================================================== */}
+      <section className="rounded-xl border border-[#DED5C7] bg-white">
+        <header className="border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#917C61]">
+            04 · Supporting Materials
+          </p>
+
+          <h2 className="mt-1 font-serif text-lg font-bold text-[#493A2D]">
+            Attachments
+          </h2>
+
+          <p className="mt-1 text-[10px] leading-4 text-[#897A68]">
+            Ảnh, tài liệu và research data có thể bổ sung cho bài viết,
+            nhưng không thay thế citation.
+          </p>
+        </header>
+
+        <div className="p-5">
+        {initialData.attachments.length > 0 && (
+          <div className="mb-4 rounded-lg border border-[#DDD3C5] bg-[#FAF8F4] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#806A50]">
+                  Existing attachments
+                </p>
+
+                <p className="mt-1 text-[10px] leading-4 text-[#918270]">
+                  File cũ được giữ mặc định. File bạn loại bỏ sẽ bị xóa khi revision được gửi lại.
+                </p>
+              </div>
+
+              <span className="shrink-0 text-[9px] font-bold text-[#8E7C66]">
+                {retainedAttachmentIds.length} retained
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {initialData.attachments.map(
+                (attachment) => {
+                  const retained =
+                    retainedAttachmentIds.includes(
+                      attachment.id,
+                    );
+
+                  return (
+                    <div
+                      key={attachment.id}
+                      className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 ${
+                        retained
+                          ? "border-[#DED5C7] bg-white"
+                          : "border-rose-200 bg-rose-50/40 opacity-65"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-[#574737]">
+                          {attachment.originalName}
+                        </p>
+
+                        <p className="mt-0.5 text-[9px] uppercase tracking-[0.08em] text-[#998B79]">
+                          {attachment.kind}
+                          {" · "}
+                          {attachment.scanStatus}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRetainedAttachmentIds(
+                            (current) =>
+                              retained
+                                ? current.filter(
+                                    (id) =>
+                                      id !==
+                                      attachment.id,
+                                  )
+                                : [
+                                    ...current,
+                                    attachment.id,
+                                  ],
+                          );
+                        }}
+                        className={`shrink-0 rounded-md border px-2.5 py-1.5 text-[9px] font-bold ${
+                          retained
+                            ? "border-rose-200 text-rose-700 hover:bg-rose-50"
+                            : "border-[#A89172] text-[#70583D] hover:bg-[#F3EDE4]"
+                        }`}
+                      >
+                        {retained
+                          ? "Remove"
+                          : "Restore"}
+                      </button>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        )}
+
+          <AttachmentUploader
+            uploadSessionId={uploadSessionId}
+            onReadyAttachmentIdsChange={setAttachmentIds}
+            onBusyChange={setAttachmentsBusy}
+          />
+        </div>
+      </section>
+
+      {/* ====================================================
+          PRE-SUBMISSION CHECK
+      ==================================================== */}
+      <section className="rounded-xl border border-[#D6CAB7] bg-[#F3EEE5] p-5">
+        <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#8B7355]">
+          Pre-publication check
+        </p>
+
+        <div className="mt-3 grid gap-2 text-[10px] text-[#6F604D] sm:grid-cols-2">
+          <p>
+            {title.trim().length >=
+            12
+              ? "✓"
+              : "○"}{" "}
+            Tiêu đề đủ rõ
+          </p>
+
+          <p>
+            {content.trim()
+              .length >=
+            minimumContent
+              ? "✓"
+              : "○"}{" "}
+            Nội dung đủ chiều sâu
+          </p>
+
+          <p>
+            {citations.length >=
+            minimumCitations
+              ? "✓"
+              : "○"}{" "}
+            Đủ số citation bắt buộc
+          </p>
+
+          <p>
+            {citationValidity
+              ? "✓"
+              : "○"}{" "}
+            Citation có title + URL/DOI
+          </p>
+
+          <p>
+            {!attachmentsBusy
+              ? "✓"
+              : "○"}{" "}
+            Attachment upload đã hoàn tất
+          </p>
+
+          <p>
+            {attachmentIds.length > 0
+              ? `✓ ${attachmentIds.length} attachment sẵn sàng`
+              : "✓ Không có attachment bắt buộc"}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-lg border border-rose-200 bg-white px-4 py-3 text-xs font-semibold text-rose-700">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
+          <p className="max-w-xl text-[10px] leading-5 text-[#84745F]">
+            Submit không đồng nghĩa publish. Bài sẽ được lưu
+            ở trạng thái REVIEWING cho tới khi moderation engine
+            đưa ra quyết định.
+          </p>
+
+          <button
+            type="submit"
+            disabled={
+              !canSubmit
+            }
+            className="shrink-0 rounded-lg bg-[#665038] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#513E2B] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            {submitting
+              ? "Đang gửi lại..."
+              : "Resubmit for review"}
+          </button>
+        </div>
+      </section>
+    </form>
+  );
+}

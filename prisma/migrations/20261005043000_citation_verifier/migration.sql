@@ -1,0 +1,6 @@
+ALTER TYPE "CitationVerificationStatus"
+ADD VALUE IF NOT EXISTS 'MISMATCH';
+
+ALTER TABLE "Citation"
+ADD COLUMN IF NOT EXISTS "verificationMetadata" JSONB,
+ADD COLUMN IF NOT EXISTS "verifiedAt" TIMESTAMP(3);

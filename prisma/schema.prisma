@@ -1,0 +1,868 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// USER
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  username  String?  @unique
+  createdAt DateTime @default(now())
+
+  // Thông tin profile
+  dateOfBirth DateTime?
+  zodiacSign  String?
+  hobbies     String?
+  location    String?
+  bio         String?
+  avatarUrl   String?
+  settings    UserSettings?
+  // ==========================================================
+  // PERSONALITY TYPE HIỂN THỊ / ĐÃ XÁC NHẬN
+  // ==========================================================
+
+  // Giá trị user tự nhập thủ công.
+  // Giữ lại ngay cả khi user tạm chọn kết quả từ bài test để hiển thị.
+  manualMbtiType            String?
+  manualEnneagramType       String?
+  manualEnneagramWing       String?
+  manualEnneagramTritype    String?
+  // Type mà user đã xác nhận dùng làm "identity" hiện tại.
+  //
+  // Profile công khai + Discover + Discussion recommendation
+  // phải dùng các field này, KHÔNG tự lấy TestResult mới nhất.
+  confirmedMbtiType         String?
+  confirmedEnneagramType    String?
+  confirmedEnneagramWing    String?
+  confirmedEnneagramTritype String?
+  // Nguồn của type đã xác nhận:
+  // "MANUAL" hoặc "TEST"
+  confirmedMbtiSource       String?
+  confirmedEnneagramSource  String?
+
+  // Nếu source = TEST, lưu id của TestResult mà user đã chọn.
+  // Chỉ để truy vết nguồn; recommendation không cần join TestResult.
+  confirmedMbtiTestResultId      String?
+  confirmedEnneagramTestResultId String?
+
+  // Một user có thể có nhiều kết quả test
+  testResults TestResult[]
+
+  // Quan hệ bạn bè
+  sentRequests     Friendship[] @relation("SentFriendRequests")
+  receivedRequests Friendship[] @relation("ReceivedFriendRequests")
+
+  // Chat 1-1
+  conversationsAsA Conversation[] @relation("ConversationParticipantA")
+  conversationsAsB Conversation[] @relation("ConversationParticipantB")
+  sentMessages     Message[]      @relation("MessageSender")
+
+  // Notifications
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+  actedNotifications    Notification[] @relation("NotificationActor")
+
+  // Blocking
+  blocksCreated           UserBlock[]             @relation("BlocksCreated")
+  blocksReceived          UserBlock[]             @relation("BlocksReceived")
+  // Discussion groups
+  discussionGroupsCreated DiscussionGroup[]       @relation("DiscussionGroupCreator")
+  discussionGroupMembers  DiscussionGroupMember[]
+}
+
+// ============================================================
+// FRIENDSHIP
+// ============================================================
+
+model Friendship {
+  id String @id @default(cuid())
+
+  senderId String
+  sender   User   @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User   @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([senderId, receiverId])
+}
+
+// ============================================================
+// TEST RESULT
+// ============================================================
+
+// Consent là riêng cho từng kết quả test.
+//
+// Nếu statisticsConsent = false:
+// - user vẫn xem được kết quả;
+// - kết quả vẫn có thể được tính vào tổng số người/lượt làm test;
+// - kết quả KHÔNG được kết hợp với dữ liệu profile để filter
+//   hoặc phân tích Statistics.
+//
+// Nếu statisticsConsent = true:
+// - kết quả có thể được dùng trong Statistics tổng hợp;
+// - có thể kết hợp với các field profile được whitelist;
+// - không có nghĩa là kết quả/profile được công khai cho người khác.
+model TestResult {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Nhóm bài test.
+  //
+  // Ví dụ:
+  // "MBTI"
+  // "ENNEAGRAM"
+  //
+  // Statistics có thể group theo testType để gộp
+  // Traditional và AI Adaptive chung một nhóm.
+  testType String
+
+  // Biến thể bài test.
+  //
+  // Cognitive Functions:
+  // "TRADITIONAL_72"
+  // "AI_ADAPTIVE"
+  //
+  // Enneagram:
+  // "TRADITIONAL"
+  //
+  // Optional để dữ liệu cũ không bị lỗi.
+  testVariant String?
+
+  // Kết quả cuối cùng.
+  //
+  // Ví dụ:
+  // "INTJ"
+  // "ENTP"
+  // "Type 5w4"
+  resultName String
+
+  // Thông tin bổ sung nếu cần.
+  //
+  // Không lưu raw open-ended AI answers ở đây.
+  details String?
+
+  // ==========================================================
+  // STATISTICS CONSENT
+  // ==========================================================
+
+  // User có đồng ý cho kết quả test này được kết hợp
+  // với các thông tin profile phù hợp để phục vụ
+  // Statistics tổng hợp / filter hay không.
+  //
+  // Không bao giờ được tick sẵn.
+  statisticsConsent Boolean @default(false)
+
+  // Version của nội dung consent mà user đã thấy.
+  //
+  // Ví dụ:
+  // "stats-consent-v1"
+  statisticsConsentVersion String?
+
+  // Thời điểm user đồng ý.
+  statisticsConsentedAt DateTime?
+
+  // Thời điểm user thu hồi consent.
+  statisticsConsentRevokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([testType])
+  @@index([testType, statisticsConsent])
+  @@index([userId, createdAt])
+}
+
+// ============================================================
+// DISCUSSION POST
+// ============================================================
+
+model Post {
+  id             String   @id @default(cuid())
+  title          String
+  content        String
+  authorId       String
+  authorName     String
+  authorImage    String?
+  personalityTag String
+  likesCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // ==========================================================
+  // DISCUSSION V2 — CONTENT CLASSIFICATION
+  // ==========================================================
+
+  // Bài viết thuộc loại bằng chứng, lý thuyết,
+  // diễn giải hay câu hỏi.
+  postKind PostKind @default(INTERPRETATION)
+
+  // Publication/moderation lifecycle.
+  moderationStatus ModerationStatus @default(DRAFT)
+
+  // Điểm tổng hợp cuối cùng của moderation engine.
+  // Không dùng field này như "truth score".
+  moderationScore Float?
+
+  // Version moderation gần nhất áp dụng cho bài.
+  // Existing posts sẽ được backfill = 0 trong migration.
+  moderationVersion Int @default(1)
+
+  // Chỉ được set khi bài đã thực sự được publish.
+  publishedAt DateTime?
+
+  // ==========================================================
+  // DISCUSSION FORUM
+  // ==========================================================
+
+  // Legacy posts có thể null.
+  // Bài mới sau khi Discussion V2 hoàn thiện sẽ bắt buộc chọn forum
+  // ở application layer trước khi submit moderation.
+  forumId String?
+  forum   Forum?  @relation(fields: [forumId], references: [id], onDelete: SetNull)
+
+  // Optional community context.
+  // System Forum vẫn là classification chính thức của MOSAIC.
+  groupId String?
+  group   DiscussionGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  comments Comment[]
+  likes    Like[]
+
+  citations         Citation[]
+  moderationReviews ModerationReview[]
+  attachments       PostAttachment[]
+
+  @@index([moderationStatus, createdAt])
+  @@index([postKind, createdAt])
+  @@index([publishedAt])
+  @@index([forumId, publishedAt])
+  @@index([groupId, moderationStatus, publishedAt])
+}
+
+// ============================================================
+// COMMENT
+// ============================================================
+
+model Comment {
+  id String @id @default(cuid())
+
+  content String
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  authorId    String
+  authorName  String
+  authorImage String?
+
+  createdAt DateTime  @default(now())
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
+  moderationStatus  ModerationStatus          @default(REVIEWING)
+  moderationVersion Int                       @default(1)
+  moderationReasons String[]                  @default([])
+  publishedAt       DateTime?
+  updatedAt         DateTime                  @default(now()) @updatedAt
+  reviewToken       String?
+  reviewStartedAt   DateTime?
+  reviewQueuedAt    DateTime?
+  reviewError       String?
+  submissionKey     String?                   @unique
+  moderationReviews CommentModerationReview[]
+
+  @@index([postId, moderationStatus, createdAt])
+  @@index([parentId, moderationStatus, createdAt])
+  @@index([authorId, moderationStatus, createdAt])
+}
+
+// ============================================================
+// LIKE
+// ============================================================
+
+model Like {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+// ============================================================
+// SYSTEM DISCUSSION FORUMS
+// ============================================================
+
+enum ForumModerationPolicy {
+  // Citation/evidence rules bình thường.
+  STANDARD
+
+  // Dành cho research, psychometrics:
+  // citation/evidence requirements nghiêm hơn.
+  STRICT_RESEARCH
+
+  // Dành cho Meta / platform discussion:
+  // không bắt buộc mọi bài phải có typology citation.
+  META_LIGHT
+}
+
+model Forum {
+  id String @id @default(cuid())
+
+  // Stable route identifier:
+  // /discussion/f/cognitive-functions
+  slug String @unique
+
+  name        String
+  description String
+
+  // Label nhỏ để UI giải thích mục đích forum.
+  shortLabel String?
+
+  moderationPolicy ForumModerationPolicy @default(STANDARD)
+
+  // System forums không cho user tự xóa / tạo.
+  isSystem Boolean @default(true)
+
+  // Có thể tạm ẩn forum mà không mất posts.
+  isActive Boolean @default(true)
+
+  displayOrder Int @default(0)
+
+  posts Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, displayOrder])
+  @@index([moderationPolicy])
+}
+
+// ============================================================
+// DISCUSSION V2
+// ============================================================
+
+// Phân biệt rõ evidence / theory / interpretation.
+// QUESTION được phép có requirements nhẹ hơn.
+enum PostKind {
+  EMPIRICAL_EVIDENCE
+  ESTABLISHED_THEORY
+  INTERPRETATION
+  QUESTION
+}
+
+// Lifecycle của bài viết.
+//
+// DRAFT
+//   User còn đang soạn.
+//
+// REVIEWING
+//   Đang qua rule checks / citation checks / AI reviewer.
+//
+// APPROVED
+//   Được phép publish.
+//
+// REVISION_REQUIRED
+//   Có thể sửa rồi submit lại.
+//
+// REJECTED
+//   Vi phạm rule đủ nghiêm trọng để không publish.
+enum ModerationStatus {
+  DRAFT
+  REVIEWING
+  APPROVED
+  REVISION_REQUIRED
+  REJECTED
+}
+
+// Đây là classification của nguồn,
+// KHÔNG phải phán quyết nguồn đó "đúng".
+enum CitationSourceType {
+  PEER_REVIEWED
+  ACADEMIC_BOOK
+  PRIMARY_THEORY
+  PROFESSIONAL_ORGANIZATION
+  SECONDARY_REFERENCE
+  COMMUNITY_SOURCE
+  UNKNOWN
+}
+
+// Trạng thái kiểm tra identifier / URL.
+// VERIFIED chỉ có nghĩa nguồn được xác minh tồn tại,
+// không có nghĩa mọi claim của bài đều đúng.
+enum CitationVerificationStatus {
+  PENDING
+  VERIFIED
+  UNREACHABLE
+  MISMATCH
+  INVALID
+}
+
+enum DiscussionGroupVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum DiscussionGroupJoinPolicy {
+  OPEN
+  APPROVAL
+  INVITE_ONLY
+}
+
+enum DiscussionGroupMemberRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+enum DiscussionGroupMemberStatus {
+  PENDING
+  ACTIVE
+  BANNED
+}
+
+enum ModerationDecision {
+  APPROVE
+  REVISION_REQUIRED
+  REJECT
+}
+
+// ============================================================
+// CITATION
+// ============================================================
+
+model Citation {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Bibliographic metadata
+  title     String
+  authors   String?
+  year      Int?
+  publisher String?
+
+  // Một citation có thể dùng URL, DOI hoặc cả hai.
+  // Application layer sau này sẽ bắt buộc có identifier/source
+  // phù hợp trước khi submit moderation.
+  url String?
+  doi String?
+
+  sourceType         CitationSourceType         @default(UNKNOWN)
+  verificationStatus CitationVerificationStatus @default(PENDING)
+  verificationNote   String?
+
+  // Machine-readable metadata từ Citation Verifier.
+  verificationMetadata Json?
+
+  // Lần verifier gần nhất hoàn tất.
+  verifiedAt DateTime?
+
+  // Giữ đúng thứ tự [1], [2], [3] trong bài.
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId, sortOrder])
+  @@index([sourceType])
+  @@index([verificationStatus])
+}
+
+// ============================================================
+// MODERATION REVIEW
+// ============================================================
+
+// Mỗi lần submit/re-submit sẽ tạo một review mới.
+// Không overwrite lịch sử moderation cũ.
+model ModerationReview {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Version của Post mà review này đã đánh giá.
+  moderationVersion Int @default(1)
+
+  // Snapshot nội dung tại đúng thời điểm review.
+  // Nhờ vậy revision sau không làm mất audit trail của revision trước.
+  submissionSnapshot Json?
+
+  decision ModerationDecision
+
+  // Các score này phục vụ policy engine.
+  // Không nên hiển thị như "độ đúng khoa học" tuyệt đối.
+  relevanceScore Float?
+  citationScore  Float?
+  evidenceScore  Float?
+  civilityScore  Float?
+  confidence     Float?
+
+  // Structured output từ reviewer:
+  // unsupported claims, citation concerns,
+  // safety findings, revision suggestions...
+  findings Json
+
+  // Audit trail
+  modelName     String?
+  promptVersion String
+  policyVersion String
+
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([postId, moderationVersion, createdAt])
+  @@index([decision, createdAt])
+}
+
+// ============================================================
+// DISCUSSION ATTACHMENTS
+// ============================================================
+
+// Attachment là supplementary material.
+// Nó KHÔNG tự động được coi là citation/evidence.
+enum AttachmentKind {
+  IMAGE
+  DOCUMENT
+  DATASET
+  SUPPLEMENTARY
+}
+
+// Security scan khác với content moderation.
+//
+// CLEAN chỉ có nghĩa file vượt qua các kiểm tra kỹ thuật /
+// security đang được áp dụng.
+// Nó không có nghĩa nội dung file phù hợp để publish.
+enum AttachmentScanStatus {
+  PENDING
+  SCANNING
+  CLEAN
+  UNSAFE
+  ERROR
+}
+
+// Nội dung attachment được moderation riêng.
+//
+// Post chỉ có thể publish nếu mọi attachment được dùng
+// đều APPROVED.
+enum AttachmentModerationStatus {
+  PENDING
+  REVIEWING
+  APPROVED
+  REJECTED
+  ERROR
+}
+
+model PostAttachment {
+  id String @id @default(cuid())
+
+  // Attachment có thể tồn tại trước khi Post được tạo.
+  // Sau khi submit composer, attachment mới được link vào post.
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Post hiện tại dùng Clerk userId làm authorId,
+  // vì vậy upload ownership cũng dùng Clerk id để nhất quán.
+  uploaderClerkId String
+
+  // Browser tạo một uploadSessionId cho mỗi composer session.
+  // Nhờ vậy user có thể upload file trước khi submit Post.
+  uploadSessionId String
+
+  kind AttachmentKind
+
+  originalName String
+
+  // Luôn là path trong PRIVATE bucket,
+  // không lưu public URL vào database.
+  storagePath String @unique
+
+  mimeType  String
+  sizeBytes Int
+
+  // Hash phục vụ duplicate detection / integrity.
+  sha256 String?
+
+  scanStatus AttachmentScanStatus @default(PENDING)
+  scanNote   String?
+
+  moderationStatus AttachmentModerationStatus @default(PENDING)
+
+  // Machine-readable moderation result.
+  moderationFindings Json?
+
+  // Lý do ngắn để giải thích cho author.
+  moderationReason String?
+
+  // Chỉ preview nhỏ phục vụ audit/debug.
+  // Không lưu toàn bộ nội dung document ở đây.
+  extractedTextPreview String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([uploadSessionId, uploaderClerkId])
+  @@index([uploaderClerkId, createdAt])
+  @@index([postId])
+  @@index([scanStatus, moderationStatus])
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+
+model Conversation {
+  id String @id @default(cuid())
+
+  participantAId String
+  participantA   User   @relation("ConversationParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+
+  participantBId String
+  participantB   User   @relation("ConversationParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([participantAId, participantBId])
+  @@index([participantAId, updatedAt])
+  @@index([participantBId, updatedAt])
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  content String
+
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+
+  POST_COMMENT
+  COMMENT_REPLY
+  POST_REACTION
+
+  COMMUNITY_ACTIVITY
+  SYSTEM
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  recipientId String
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  type NotificationType
+
+  title String
+  body  String?
+
+  href String?
+
+  entityType String?
+  entityId   String?
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([recipientId, createdAt])
+  @@index([actorId])
+  @@index([entityType, entityId])
+}
+
+// ============================================================
+// USER BLOCKS
+// ============================================================
+
+model UserBlock {
+  id String @id @default(cuid())
+
+  blockerId String
+  blocker   User   @relation("BlocksCreated", fields: [blockerId], references: [id], onDelete: Cascade)
+
+  blockedId String
+  blocked   User   @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId, createdAt])
+  @@index([blockedId, createdAt])
+}
+
+// ============================================================
+// USER-CREATED DISCUSSION GROUPS
+// ============================================================
+
+model DiscussionGroup {
+  id String @id @default(cuid())
+
+  slug String @unique
+  name String
+
+  description String
+  rules       String?
+
+  visibility DiscussionGroupVisibility @default(PUBLIC)
+  joinPolicy DiscussionGroupJoinPolicy @default(OPEN)
+
+  creatorId String
+  creator   User   @relation("DiscussionGroupCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  isActive Boolean @default(true)
+
+  posts   Post[]
+  members DiscussionGroupMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creatorId, createdAt])
+  @@index([isActive, createdAt])
+  @@index([visibility, isActive])
+}
+
+model DiscussionGroupMember {
+  id String @id @default(cuid())
+
+  groupId String
+  group   DiscussionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role   DiscussionGroupMemberRole   @default(MEMBER)
+  status DiscussionGroupMemberStatus @default(ACTIVE)
+
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([groupId, status, role])
+}
+
+model CommentModerationReview {
+  id                 String           @id @default(cuid())
+  commentId          String
+  comment            Comment          @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  moderationVersion  Int
+  decision           ModerationStatus
+  submissionSnapshot Json
+  findings           Json
+  modelName          String
+  promptVersion      String
+  policyVersion      String
+  createdAt          DateTime         @default(now())
+
+  @@unique([commentId, moderationVersion])
+  @@index([commentId, createdAt])
+}
+
+// ============================================================
+// DISCUSSION DRAFTS
+// ============================================================
+//
+// Đây là editing state, KHÔNG phải published Post.
+//
+// Citation có thể chưa hoàn chỉnh.
+// Attachment vẫn chưa được claim vào Post.
+// Khi submit thật, discussion-submission.ts mới normalize,
+// validate, tạo Post + Citation và claim attachment atomically.
+//
+model DiscussionDraft {
+  id String @id @default(cuid())
+
+  // Post hiện tại dùng Clerk user id cho ownership,
+  // draft dùng cùng convention để tránh thêm auth mapping thừa.
+  ownerClerkId String
+
+  // Một composer session có một stable upload session.
+  // Dùng làm idempotency key cho autosave.
+  uploadSessionId String
+
+  // Classification/context đang chọn.
+  // Không tạo FK vì Forum/Group có thể thay đổi
+  // trong lúc draft tồn tại; submit flow sẽ validate lại.
+  forumId String?
+  groupId String?
+
+  postKind PostKind @default(INTERPRETATION)
+
+  title          String @default("")
+  content        String @default("")
+  personalityTag String @default("Chung")
+
+  // Editing-state JSON.
+  // Cho phép citation đang nhập dở mà không làm bẩn Citation model.
+  citationDrafts Json
+
+  // Chỉ lưu IDs. Attachment thực tế vẫn thuộc upload session
+  // và postId = null cho đến khi submit thật.
+  attachmentIds Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerClerkId, uploadSessionId])
+  @@index([ownerClerkId, updatedAt])
+  @@index([groupId, updatedAt])
+}
+
+// Preferences are private to the authenticated account.
+model UserSettings {
+  userId                String @id
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationFriends   Boolean @default(true)
+  notificationComments  Boolean @default(true)
+  notificationReactions Boolean @default(true)
+  notificationReviews   Boolean @default(true)
+  reducedMotion         Boolean @default(false)
+  showDecorations       Boolean @default(true)
+  textSize              String @default("NORMAL")
+  revision              Int @default(0)
+  updatedAt             DateTime @default(now()) @updatedAt
+}
