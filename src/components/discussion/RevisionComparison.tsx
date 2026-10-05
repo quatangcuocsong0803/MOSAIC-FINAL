@@ -568,8 +568,8 @@ export default function RevisionComparison({
         </div>
       ) : (
         <>
-          <div className="mt-4 overflow-hidden rounded-md border border-[#E0D7CA] bg-white">
-            <div className="grid grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#E9E2D8] bg-[#F5F1EA] text-[8px] font-extrabold uppercase tracking-[0.09em] text-[#907A61]">
+          <div tabIndex={0} role="region" aria-label="So sánh phiên bản, có thể cuộn ngang" className="mt-4 overflow-x-auto rounded-md border border-[#E0D7CA] bg-white">
+            <div className="grid min-w-[560px] [overflow-wrap:anywhere] grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#E9E2D8] bg-[#F5F1EA] text-[8px] font-extrabold uppercase tracking-[0.09em] text-[#907A61]">
               <div className="p-2.5">
                 Field
               </div>
@@ -600,7 +600,7 @@ export default function RevisionComparison({
                     key={
                       row.label
                     }
-                    className="grid grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#EEE7DD] text-[10px] last:border-b-0"
+                    className="grid min-w-[560px] [overflow-wrap:anywhere] grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)] border-b border-[#EEE7DD] text-[10px] last:border-b-0"
                   >
                     <div className="p-2.5 font-bold text-[#75634E]">
                       {

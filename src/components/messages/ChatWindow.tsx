@@ -198,7 +198,7 @@ export default function ChatWindow({
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/messages"
-            className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-[#8B7355] hover:bg-[#F4EFE6] md:hidden"
+            className="mr-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#8B7355] hover:bg-[#F4EFE6] md:hidden"
             aria-label="Quay lại tin nhắn"
           >
             ←
@@ -297,7 +297,7 @@ export default function ChatWindow({
                     }`}
                   >
                     <div
-                      className={`group max-w-[78%] md:max-w-[68%] ${
+                      className={`group min-w-0 max-w-[85%] md:max-w-[68%] ${
                         mine
                           ? "items-end"
                           : "items-start"
@@ -310,7 +310,7 @@ export default function ChatWindow({
                             : "rounded-bl-md border border-[#E2D4B7] bg-white text-[#5C4326]"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap break-words">
+                        <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
                           {
                             message.content
                           }
@@ -349,7 +349,7 @@ export default function ChatWindow({
       </div>
 
       {/* Composer */}
-      <footer className="shrink-0 border-t border-[#E2D4B7] bg-white px-4 py-3 md:px-6">
+      <footer className="mosaic-chat-composer shrink-0 border-t border-[#E2D4B7] bg-white px-4 py-3 md:px-6">
         {error && (
           <p className="mx-auto mb-2 max-w-3xl text-xs font-medium text-rose-600">
             {error}
@@ -362,7 +362,7 @@ export default function ChatWindow({
           }
           className="mx-auto flex max-w-3xl items-end gap-2"
         >
-          <div className="flex min-h-[44px] flex-1 items-center rounded-2xl border border-[#E2D4B7] bg-[#FAF8F5] px-4 transition focus-within:border-[#8B6B4A]/55 focus-within:bg-white">
+          <div className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-2xl border border-[#E2D4B7] bg-[#FAF8F5] px-4 transition focus-within:border-[#8B6B4A]/55 focus-within:bg-white">
             <textarea
               value={content}
               onChange={(
@@ -377,6 +377,7 @@ export default function ChatWindow({
                 event,
               ) => {
                 if (
+                  !event.nativeEvent.isComposing &&
                   event.key ===
                     "Enter" &&
                   !event.shiftKey

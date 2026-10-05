@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./Navbar.module.css";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 import { getUserProfile } from "@/app/actions/profile";
@@ -30,6 +30,19 @@ const navItems = [
 export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); menuRef.current?.focus(); }
+    };
+    const media = window.matchMedia("(min-width:1181px)");
+    const onResize = () => { if (media.matches) setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    media.addEventListener("change", onResize);
+    return () => { window.removeEventListener("keydown", onKey); media.removeEventListener("change", onResize); };
+  }, [open]);
   const { isSignedIn } = useUser();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -452,6 +465,8 @@ export default function Navbar() {
 
         <button
           type="button"
+          ref={menuRef}
+          aria-controls="mosaic-mobile-navigation"
           className={styles.menuButton}
           aria-label={
             open ? "Close navigation" : "Open navigation"
@@ -465,6 +480,8 @@ export default function Navbar() {
       </nav>
 
       <div
+        id="mosaic-mobile-navigation"
+        inert={!open}
         className={`${styles.mobilePanel} ${open ? styles.mobilePanelOpen : ""
           }`}
       >

@@ -43,6 +43,8 @@ export const searchPages: SearchPage[] = [
   page('Ảnh đại diện & hồ sơ','/settings#profile','Cài đặt','Chỉnh sửa avatar và hồ sơ cá nhân.','hinh anh avatar anh dai dien ho so'),
   page('Cài đặt thông báo','/settings#notifications','Cài đặt','Chọn thông báo bạn bè, bình luận, tương tác và duyệt bài.','notifications thong bao settings cai dat'),
   page('Cài đặt hiển thị','/settings#display','Cài đặt','Cỡ chữ, giảm chuyển động và nền trang trí.','display font co chu motion animation hinh nen'),
+  page('Góp ý — Hồi âm từ bầu trời','/feedback','MOSAIC','Chuẩn bị email góp ý, đề xuất tính năng hoặc báo lỗi.','feedback hoi am tu bau troi gop y de xuat'),
+  page('Liên hệ MOSAIC','/contact','MOSAIC','Email liên hệ và các kênh trao đổi với người phát triển.','contact lien he email thepeacefulriver ho tro'),
   page('Báo lỗi & liên hệ','/support','MOSAIC','Hướng dẫn gửi báo lỗi và góp ý trong forum Meta.','support contact bug bao loi lien he ho tro'),
   page('Quyền riêng tư','/privacy','MOSAIC','Dữ liệu và các lựa chọn quyền riêng tư hiện có.','privacy consent du lieu quyen rieng tu'),
   page('Điều khoản sử dụng','/terms','MOSAIC','Nguyên tắc cơ bản khi tham gia MOSAIC.','terms dieu khoan su dung quy dinh'),

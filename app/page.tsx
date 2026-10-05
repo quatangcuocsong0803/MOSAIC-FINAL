@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { HomeDiscussion, HomeStatistics, InsightsSkeleton } from "@/src/components/home/HomeInsights";
 import FeaturedCarousel from "@/src/components/home/FeaturedCarousel";
+import KnowledgeShowcase from "@/src/components/home/KnowledgeShowcase";
+import HomeFooter from "@/src/components/home/HomeFooter";
 import HomeSearch from "@/src/components/home/HomeSearch";
 import styles from "./home.module.css";
 
@@ -127,22 +129,10 @@ export default function HomePage() {
             <Suspense fallback={<InsightsSkeleton />}><HomeStatistics /></Suspense>
           </article>
         </section>
+        <KnowledgeShowcase />
       </div>
 
-      <footer className={styles.footer}>
-        <div className={styles.copyrightStrip}>
-          © 2026 MOSAIC — Dự án khám phá tính cách và typology
-        </div>
-        <div className={styles.footerArt}>
-          <div className={styles.footerOverlay}>
-            <nav className={styles.footerLinks} aria-label="Hỗ trợ và chính sách">{[['Báo lỗi','/support#report'],['Liên hệ','/support#contact'],['Quyền riêng tư','/privacy'],['Điều khoản sử dụng','/terms']].map(([label,href]) => <Link key={href} href={href}>{label}</Link>)}</nav>
-            <p>
-              MOSAIC là nền tảng khám phá các mô hình tính cách, cơ sở lý thuyết và những cách tiếp cận khác nhau trong typology. Nội dung trên website phục vụ mục đích tham khảo, học tập và khám phá bản thân.
-            </p>
-            <nav className={styles.footerLinks} aria-label="Điều hướng chân trang">{[['Trang chủ','/'],['Bài test','/test'],['Khám phá','/discover'],['Thảo luận','/discussion'],['Kiến thức','/knowledge'],['Thống kê','/statistics'],['Giới thiệu MOSAIC','/about'],['Cơ sở lý thuyết','/knowledge/theory'],['Nhà phát triển','/about/developer'],['Triển lãm','/about/exhibition'],['Cài đặt','/settings']].map(([label,href]) => <Link key={href} href={href}>{label}</Link>)}</nav>
-          </div>
-        </div>
-      </footer>
+      <HomeFooter />
     </div>
   );
 }

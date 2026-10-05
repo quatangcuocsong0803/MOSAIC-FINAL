@@ -462,3 +462,12 @@
 }
 
 .reference a:hover { text-decoration: underline; }
+
+@media (max-width:620px) {
+  .hero h1 { font-size:clamp(32px,9vw,43px); overflow-wrap:anywhere; }
+  .heroMeta { flex-wrap:wrap; }
+  .article,.reference,.relatedCard,.stack { overflow-wrap:anywhere; }
+  .reference a { white-space:normal; }
+  .tocLink,.tocSubLink { min-height:44px; display:flex; align-items:center; }
+  .quote { padding:18px; font-size:23px; }
+}

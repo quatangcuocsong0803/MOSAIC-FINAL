@@ -24,3 +24,8 @@
 .saveBar .actions { margin:0; }
 .note { margin:28px 0; line-height:1.8; font-size:.9rem; }
 @media(max-width:600px) { .card { padding:20px; } .row { gap:14px; } .saveBar { align-items:flex-start; } .profile { align-items:flex-start; } }
+
+@media (max-width:600px) {
+  .row { flex-wrap:wrap; }
+  .row select { max-width:100%; min-width:0; min-height:44px; font-size:max(16px,1rem); }
+}

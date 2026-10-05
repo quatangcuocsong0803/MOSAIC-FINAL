@@ -19,9 +19,9 @@ const slides = [
     eyebrow: "Hồi âm từ bầu trời",
     title: "",
     description:
-      "Có lẽ trên đời này, thứ kì diệu nhất là những cuộc gặp gỡ...",
+      "Mỗi góp ý là một lời hồi âm. Chia sẻ điều bạn muốn MOSAIC làm tốt hơn — từ một chi tiết nhỏ đến một ý tưởng mới.",
     image: "/figma-home/featured-2.jpg",
-    href: "/discover",
+    href: "/feedback",
   },
   {
     kind: "author",
