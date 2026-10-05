@@ -9,7 +9,7 @@
   padding: 54px 20px 96px;
   background:
     linear-gradient(rgba(248, 245, 238, 0.28), rgba(248, 245, 238, 0.28)),
-    url('/home/background-tile.jpg') center top / auto calc(100% / 7.2) repeat;
+    url('/home/editorial-floral-tile.jpg') left top / 713.5px 551px repeat;
   color: var(--ink);
   font-family: "Cormorant Garamond", Georgia, serif;
 }

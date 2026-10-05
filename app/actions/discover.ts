@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { discoverWhere, discoverSelect, DISCOVER_PAGE_SIZE, type DiscoverOptions } from "@/lib/discover/query";
 import { revalidatePath } from "next/cache";
 import { isBlockedBetween } from "@/lib/blocks";
 import {
@@ -49,6 +50,8 @@ export interface GetDiscoverUsersResponse {
   error?: string;
   currentUserId?: string;
   users: DiscoverUserItem[];
+  hasMore?: boolean;
+  nextCursor?: string;
 }
 
 function normalizeMbti(
@@ -75,20 +78,6 @@ function normalizeEnneagramCore(
     : null;
 }
 
-function displayEnneagramCore(
-  value: string | null | undefined
-): string | null {
-  const normalized =
-    normalizeEnneagramCore(value);
-
-  if (!normalized) return null;
-
-  const match = normalized.match(/[1-9]/);
-
-  return match
-    ? `Type ${match[0]}`
-    : null;
-}
 
 /**
  * Discover chỉ dùng personality identity đã được user xác nhận.
@@ -101,309 +90,50 @@ function displayEnneagramCore(
  * Manual và Test được đối xử giống nhau:
  * chỉ confirmed... mới là source of truth.
  */
-export async function getDiscoverUsers(): Promise<GetDiscoverUsersResponse> {
+export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<GetDiscoverUsersResponse> {
+  let currentId: string | undefined;
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
-      return {
-        success: false,
-        error:
-          "Vui lòng đăng nhập để khám phá thành viên và kết nối.",
-        users: [],
-      };
+    const {userId}=await auth();
+    if(!userId) return {success:false,error:'Vui lòng đăng nhập để khám phá thành viên và kết nối.',users:[]};
+    let me=await prisma.user.findUnique({where:{clerkId:userId},select:{id:true,confirmedMbtiType:true,confirmedEnneagramType:true}});
+    if(!me) {
+      const clerkUser=await currentUser();
+      const name=clerkUser?.username || [clerkUser?.firstName,clerkUser?.lastName].filter(Boolean).join(' ') || `user_${userId.slice(-6)}`;
+      const exists=await prisma.user.findUnique({where:{username:name},select:{id:true}});
+      me=await prisma.user.upsert({where:{clerkId:userId},update:{},create:{clerkId:userId,username:exists?`${name}_${userId.slice(-6)}`:name},select:{id:true,confirmedMbtiType:true,confirmedEnneagramType:true}});
     }
-
-    // ========================================================
-    // 1. Lấy / tạo user hiện tại
-    // ========================================================
-
-    let currentUserRecord =
-      await prisma.user.findUnique({
-        where: {
-          clerkId: userId,
-        },
-      });
-
-    if (!currentUserRecord) {
-      const clerkUser =
-        await currentUser();
-
-      let username =
-        clerkUser?.username ||
-        [
-          clerkUser?.firstName,
-          clerkUser?.lastName,
-        ]
-          .filter(Boolean)
-          .join(" ");
-
-      if (!username) {
-        username =
-          `user_${userId.slice(-6)}`;
-      }
-
-      const existingUser =
-        await prisma.user.findUnique({
-          where: {
-            username,
-          },
-        });
-
-      if (
-        existingUser &&
-        existingUser.clerkId !== userId
-      ) {
-        username =
-          `${username}_${userId.slice(-4)}`;
-      }
-
-      currentUserRecord =
-        await prisma.user.create({
-          data: {
-            clerkId: userId,
-            username,
-          },
-        });
+    currentId=me.id;
+    const myMbti=normalizeMbti(me.confirmedMbtiType);
+    const myCore=normalizeEnneagramCore(me.confirmedEnneagramType)?.slice(-1) || null;
+    const tab=['suggested','requests','community'].includes(options.tab||'')?options.tab:'community';
+    const after=typeof options.after==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(options.after)?options.after:undefined;
+    const [rows,friendships]=await Promise.all([
+      prisma.user.findMany({where:discoverWhere(me.id,myMbti,myCore,{...options,tab}),select:discoverSelect,orderBy:[{createdAt:'desc'},{id:'desc'}],take:DISCOVER_PAGE_SIZE+1,...(after?{cursor:{id:after},skip:1}:{})}),
+      prisma.friendship.findMany({where:{OR:[{senderId:me.id},{receiverId:me.id}]},select:{senderId:true,receiverId:true,status:true}}),
+    ]);
+    const statuses=new Map<string,FriendStatus>();
+    for(const friend of friendships) {
+      const other=friend.senderId===me.id?friend.receiverId:friend.senderId;
+      const old=statuses.get(other);
+      if(friend.status==='ACCEPTED') statuses.set(other,'FRIENDS');
+      else if(friend.status==='PENDING' && old!=='FRIENDS' && old!=='PENDING_SENT') statuses.set(other,friend.senderId===me.id?'PENDING_SENT':'PENDING_RECEIVED');
     }
-
-    // Users bị block theo bất kỳ chiều nào đều biến mất khỏi Discover.
-    const blockRows =
-      await prisma.userBlock.findMany({
-        where: {
-          OR: [
-            {
-              blockerId:
-                currentUserRecord.id,
-            },
-            {
-              blockedId:
-                currentUserRecord.id,
-            },
-          ],
-        },
-
-        select: {
-          blockerId: true,
-          blockedId: true,
-        },
-      });
-
-    const hiddenUserIds =
-      blockRows.map((block) =>
-        block.blockerId ===
-        currentUserRecord.id
-          ? block.blockedId
-          : block.blockerId,
-      );
-
-    // ========================================================
-    // 2. Personality identity hiện tại của chính tôi
-    // ========================================================
-
-    const myMbti =
-      normalizeMbti(
-        currentUserRecord.confirmedMbtiType
-      );
-
-    const myEnneagram =
-      normalizeEnneagramCore(
-        currentUserRecord.confirmedEnneagramType
-      );
-
-    // ========================================================
-    // 3. Lấy user khác
-    //
-    // Không include testResults nữa.
-    // ========================================================
-
-    const otherUsers =
-      await prisma.user.findMany({
-        where: {
-          id: {
-            not: currentUserRecord.id,
-            notIn: hiddenUserIds,
-          },
-        },
-
-        include: {
-          sentRequests: {
-            where: {
-              receiverId:
-                currentUserRecord.id,
-            },
-          },
-
-          receivedRequests: {
-            where: {
-              senderId:
-                currentUserRecord.id,
-            },
-          },
-        },
-
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-    // ========================================================
-    // 4. Match bằng confirmed identity
-    // ========================================================
-
-    const users: DiscoverUserItem[] =
-      otherUsers.map((user) => {
-        const commonTraits: string[] =
-          [];
-
-        const otherMbti =
-          normalizeMbti(
-            user.confirmedMbtiType
-          );
-
-        const otherEnneagram =
-          normalizeEnneagramCore(
-            user.confirmedEnneagramType
-          );
-
-        if (
-          myMbti &&
-          otherMbti &&
-          myMbti === otherMbti
-        ) {
-          commonTraits.push(
-            `MBTI: ${otherMbti}`
-          );
-        }
-
-        if (
-          myEnneagram &&
-          otherEnneagram &&
-          myEnneagram === otherEnneagram
-        ) {
-          const display =
-            displayEnneagramCore(
-              user.confirmedEnneagramType
-            );
-
-          if (display) {
-            commonTraits.push(
-              `Enneagram: ${display}`
-            );
-          }
-        }
-
-        const isMatched =
-          commonTraits.length > 0;
-
-        // ====================================================
-        // Friend status
-        // ====================================================
-
-        let friendStatus: FriendStatus =
-          "NONE";
-
-        // Đối phương gửi cho tôi.
-        const requestReceived =
-          user.sentRequests[0];
-
-        // Tôi gửi cho đối phương.
-        const requestSent =
-          user.receivedRequests[0];
-
-        if (
-          requestReceived?.status ===
-            "ACCEPTED" ||
-          requestSent?.status ===
-            "ACCEPTED"
-        ) {
-          friendStatus = "FRIENDS";
-        } else if (
-          requestSent?.status ===
-          "PENDING"
-        ) {
-          friendStatus =
-            "PENDING_SENT";
-        } else if (
-          requestReceived?.status ===
-          "PENDING"
-        ) {
-          friendStatus =
-            "PENDING_RECEIVED";
-        }
-
-        // ====================================================
-        // Public personality data cho UserCard
-        //
-        // Giữ field testResults để không phải sửa UI ngay,
-        // nhưng chỉ tạo dữ liệu từ confirmed identity.
-        // Không trả lịch sử TestResult thật.
-        // ====================================================
-
-        const publicPersonalityResults: DiscoverUserItem["testResults"] =
-          [];
-
-        if (otherMbti) {
-          publicPersonalityResults.push({
-            id: `confirmed-mbti-${user.id}`,
-            testType: "MBTI",
-            resultName: otherMbti,
-            details: null,
-          });
-        }
-
-        const otherEnneagramDisplay =
-          displayEnneagramCore(
-            user.confirmedEnneagramType
-          );
-
-        if (otherEnneagramDisplay) {
-          publicPersonalityResults.push({
-            id: `confirmed-enneagram-${user.id}`,
-            testType: "ENNEAGRAM",
-            resultName:
-              otherEnneagramDisplay,
-            details: null,
-          });
-        }
-
-        return {
-          id: user.id,
-          clerkId: user.clerkId,
-          username: user.username,
-          createdAt: user.createdAt,
-          avatarUrl: user.avatarUrl,
-          bio: user.bio,
-          hobbies: user.hobbies,
-          location: user.location,
-
-          testResults:
-            publicPersonalityResults,
-
-          isMatched,
-          commonTraits,
-          friendStatus,
-        };
-      });
-
-    return {
-      success: true,
-      currentUserId:
-        currentUserRecord.id,
-      users,
-    };
-  } catch (error) {
-    console.error(
-      "Lỗi getDiscoverUsers:",
-      error
-    );
-
-    return {
-      success: false,
-      error:
-        "Đã có lỗi xảy ra khi tải danh sách thành viên.",
-      users: [],
-    };
+    const page=rows.slice(0,DISCOVER_PAGE_SIZE);
+    const users:DiscoverUserItem[]=page.map(user=>{
+      const mbti=normalizeMbti(user.confirmedMbtiType);
+      const core=normalizeEnneagramCore(user.confirmedEnneagramType)?.slice(-1)||null;
+      const commonTraits:string[]=[];
+      if(mbti && mbti===myMbti) commonTraits.push(`MBTI: ${mbti}`);
+      if(core && core===myCore) commonTraits.push(`Enneagram: Type ${core}`);
+      const testResults:DiscoverUserItem['testResults']=[];
+      if(mbti) testResults.push({id:`confirmed-mbti-${user.id}`,testType:'MBTI',resultName:mbti,details:null});
+      if(core) testResults.push({id:`confirmed-enneagram-${user.id}`,testType:'ENNEAGRAM',resultName:`Type ${core}`,details:null});
+      return {id:user.id,clerkId:user.clerkId,username:user.username,createdAt:user.createdAt,avatarUrl:user.avatarUrl,bio:user.bio,hobbies:user.hobbies,location:user.location,testResults,commonTraits,isMatched:commonTraits.length>0,friendStatus:statuses.get(user.id)||'NONE'};
+    });
+    return {success:true,currentUserId:me.id,users,hasMore:rows.length>DISCOVER_PAGE_SIZE,nextCursor:rows.length>DISCOVER_PAGE_SIZE?page.at(-1)?.id:undefined};
+  } catch(error) {
+    console.error('Lỗi getDiscoverUsers:',error);
+    return {success:false,currentUserId:currentId,error:'Chưa tải được danh sách thành viên. Vui lòng thử lại.',users:[]};
   }
 }
 

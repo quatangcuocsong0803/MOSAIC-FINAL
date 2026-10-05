@@ -15,7 +15,7 @@ import {
 } from "@/app/actions/profile";
 import { revokeStatisticsConsent } from "@/app/actions/test";
 import { getUserPosts, createPost } from "@/app/actions/discussion";
-import { supabase } from "@/lib/supabase";
+import { prepareAvatar } from "@/lib/avatar/prepare";
 import { notifyAvatarUpdated } from "@/lib/avatar-events";
 import type { Post, Comment } from "@prisma/client";
 import { ZODIAC_ICONS } from "@/lib/zodiac";
@@ -766,66 +766,33 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            {/* Input file ẩn, tải ảnh trực tiếp lên Supabase */}
+            {/* Input file ẩn, tải ảnh qua server đã xác thực */}
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               disabled={isUploadingAvatar}
               className="hidden"
               onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) {
-                  console.error("Chưa nhận được file từ input!");
-                  return;
-                }
+                const input = e.currentTarget;
+                const file = input.files?.[0];
+                if (!file) return;
                 setIsUploadingAvatar(true);
-
-                // Trích xuất đuôi file một cách an toàn (mặc định png nếu lỗi)
-                const rawExt = file.name.split('.').pop() || 'png';
-                const fileExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
-
-                // Tạo tên file mới hoàn toàn ngẫu nhiên và sạch sẽ (vd: avatar_1728000000_abc123.png)
-                const cleanFilePath = `avatar_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-
-                console.log("Đường dẫn file chuẩn bị upload:", cleanFilePath);
-
                 try {
-                  const { data, error } = await supabase.storage
-                    .from('mosaic-media') // Đảm bảo đúng tên bucket
-                    .upload(cleanFilePath, file, {
-                      cacheControl: '3600',
-                      upsert: false,
-                    });
-
-                  if (error) {
-                    console.error("Lỗi từ máy chủ Supabase:", error);
-                    throw new Error(error.message);
+                  const prepared = await prepareAvatar(file);
+                  const form = new FormData();
+                  form.append('avatar', prepared);
+                  const response = await fetch('/api/profile/avatar', { method: 'POST', body: form });
+                  const result = await response.json().catch(() => null);
+                  if (!response.ok || !result?.success || !result.avatarUrl) {
+                    throw new Error(result?.error || 'Chưa tải được ảnh. Vui lòng thử lại.');
                   }
-
-                  // Lấy link hiển thị
-                  const { data: publicUrlData } = supabase.storage
-                    .from('mosaic-media')
-                    .getPublicUrl(cleanFilePath);
-
-                  console.log("Upload thành công, Link ảnh:", publicUrlData.publicUrl);
-
-                  if (publicUrlData?.publicUrl) {
-                    const res = await updateUserProfile({ avatarUrl: publicUrlData.publicUrl });
-                    if (res.success && res.profile) {
-                      setProfileDetails(res.profile);
-                      notifyAvatarUpdated(res.profile.avatarUrl ?? null);
-                      router.refresh();
-                    } else {
-                      console.error("Lưu avatarUrl vào DB thất bại:", res.error);
-                      alert(res.error || "Không thể lưu ảnh đại diện.");
-                    }
-                  }
-                } catch (err: any) {
-                  console.error("Lỗi trong quá trình upload:", err);
-                  alert(`Tải ảnh thất bại. Xem chi tiết trong F12 Console.`);
+                  setProfileDetails(previous => previous ? {...previous, avatarUrl: result.avatarUrl} : previous);
+                  notifyAvatarUpdated(result.avatarUrl);
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : 'Chưa tải được ảnh. Vui lòng thử lại.');
                 } finally {
                   setIsUploadingAvatar(false);
-                  e.target.value = "";
+                  input.value = '';
                 }
               }}
             />
