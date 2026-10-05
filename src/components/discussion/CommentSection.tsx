@@ -174,7 +174,7 @@ export default function CommentSection({ postId, initialComments, onCommentAdded
       </div>)}
     </div>
     {isSignedIn ? <form onSubmit={handleSubmit} className="space-y-2">
-      {(replyTo || editing) && <div className="flex items-center justify-between gap-2 rounded bg-[#FAF8F5] p-2 text-xs text-[#5C4326]">
+      {(replyTo || editing) && <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 rounded bg-[#FAF8F5] p-2 text-xs text-[#5C4326]">
         <span>{editing ? "Chỉnh sửa nội dung chưa công khai" : `Đang trả lời ${replyTo?.authorName}`}</span>
         <button type="button" disabled={busy} onClick={() => { setReplyTo(null); setEditing(null); setContent(""); request.current = null; }}>Hủy</button>
       </div>}
@@ -182,7 +182,7 @@ export default function CommentSection({ postId, initialComments, onCommentAdded
       <textarea id={`comment-input-${postId}`} value={content} onChange={event => { setContent(event.target.value); request.current = null; }} maxLength={2000} rows={3} disabled={busy}
         placeholder={replyTo ? "Viết lời trả lời..." : "Viết lời bàn luận..."}
         className="w-full rounded-md border border-[#E2D4B7] bg-white p-3 text-sm text-gray-800 focus:border-[#8B6B4A]" />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
         <span className="text-xs text-gray-500">{content.length}/2000 · Kiểm duyệt trước khi công khai</span>
         <button type="submit" disabled={busy || !content.trim()} className="rounded-md bg-[#8B6B4A] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Đang gửi…" : editing ? "Gửi lại" : "Gửi"}</button>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import React, { useState, useEffect } from "react";
 import { ZODIAC_SIGNS, ZODIAC_ICONS, type ZodiacSign } from "@/lib/zodiac";
 import { updateUserProfile, type UserProfileData } from "@/app/actions/profile";
@@ -45,6 +46,8 @@ export default function ProfileFormModal({
   showSkipButton = false,
   onSkip,
 }: ProfileFormModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [uploadingAvatar, setUploadingAvatar] = useState<boolean>(false);
   const [dateOfBirth, setDateOfBirth] = useState<string>("");
@@ -68,7 +71,7 @@ export default function ProfileFormModal({
     }
   }, [isOpen, initialData]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   async function handleUploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -167,9 +170,9 @@ export default function ProfileFormModal({
     }
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+      className="mosaic-profile-dialog fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="profile-modal-title"
@@ -439,6 +442,6 @@ export default function ProfileFormModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>, document.body
   );
 }

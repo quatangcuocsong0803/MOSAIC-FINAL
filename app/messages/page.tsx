@@ -32,7 +32,7 @@ export default async function MessagesPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1280px] px-3 py-5 md:px-5 md:py-7">
-      <div className="h-[calc(100vh-165px)] min-h-[560px] overflow-hidden rounded-3xl border border-[#E2D4B7] bg-white shadow-[0_16px_45px_rgba(75,55,35,0.08)]">
+      <div className="mosaic-messages-shell h-[calc(100vh-165px)] min-h-[560px] overflow-hidden rounded-3xl border border-[#E2D4B7] bg-white shadow-[0_16px_45px_rgba(75,55,35,0.08)]">
         <div className="grid h-full grid-cols-1 md:grid-cols-[330px_1fr] lg:grid-cols-[360px_1fr]">
           <MessagesSidebar
             conversations={

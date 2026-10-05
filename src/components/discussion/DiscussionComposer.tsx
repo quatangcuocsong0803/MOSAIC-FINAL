@@ -793,7 +793,7 @@ export default function DiscussionComposer({
 
         <div className="space-y-4 p-5">
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap sm:flex-nowrap items-center justify-between">
               <label className="text-xs font-bold text-[#5D4C39]">
                 Tiêu đề
               </label>
@@ -817,7 +817,7 @@ export default function DiscussionComposer({
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex flex-wrap sm:flex-nowrap items-center justify-between">
               <label className="text-xs font-bold text-[#5D4C39]">
                 Nội dung
               </label>
@@ -886,7 +886,7 @@ export default function DiscussionComposer({
           CITATIONS
       ==================================================== */}
       <section className="rounded-xl border border-[#DED5C7] bg-white">
-        <header className="flex items-start justify-between gap-4 border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
+        <header className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-4 border-b border-[#E8E1D6] bg-[#FAF8F4] px-5 py-4">
           <div>
             <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#917C61]">
               03 · References
@@ -961,7 +961,7 @@ export default function DiscussionComposer({
                     }
                     className="rounded-lg border border-[#DDD3C5] bg-[#FCFBF8]"
                   >
-                    <header className="flex items-center justify-between border-b border-[#E8E1D6] px-4 py-3">
+                    <header className="flex flex-wrap sm:flex-nowrap items-center justify-between border-b border-[#E8E1D6] px-4 py-3">
                       <strong className="font-serif text-sm text-[#5D4933]">
                         Source [
                         {index + 1}]
@@ -1229,7 +1229,7 @@ export default function DiscussionComposer({
         <div className="p-5">
           {restoredAttachments.length > 0 && (
           <div className="mb-4 rounded-lg border border-[#DDD3C5] bg-[#FAF8F4] p-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-3">
               <div>
                 <p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#8B7358]">
                   Saved attachments
@@ -1254,7 +1254,7 @@ export default function DiscussionComposer({
                     key={
                       attachment.id
                     }
-                    className="flex items-center justify-between gap-3 rounded-md border border-[#E2D9CC] bg-white px-3 py-2.5"
+                    className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 rounded-md border border-[#E2D9CC] bg-white px-3 py-2.5"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[10px] font-semibold text-[#594736]">

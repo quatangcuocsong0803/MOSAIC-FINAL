@@ -928,3 +928,59 @@
 .footerLinks a { text-underline-offset:4px; padding:4px 0; }
 .footerLinks a:hover { text-decoration:underline; }
 .footerLinks a:focus-visible { outline:2px solid #fff4d5; outline-offset:4px; border-radius:2px; }
+
+/* Mobile layouts use content height so every carousel slide stays readable. */
+@media (max-width:760px) {
+  .contentSurface { width:calc(100% - 24px); padding:84px 12px 24px; }
+  .portalGrid { gap:20px; }
+  .sideColumn { justify-items:center; gap:20px; min-width:0; }
+  .editorialCard { width:100%; height:auto; flex-basis:auto; }
+  .cardImageWrap { height:170px; }
+  .cardBody { height:auto; padding:14px 16px 16px; }
+  .cardBody h2 { font-size:26px; }
+  .cardBody p { width:100%; font-size:17px; line-height:1.45; }
+  .cardLink { position:static; margin:12px 0 0 auto; width:max-content; min-height:30px; padding:4px 12px; }
+  .featureCard { width:100%; height:auto; }
+  .featureCardLink { position:relative; inset:auto; padding:22px 18px 12px; }
+  .featureCard .featureEyebrow { position:static; width:auto; font-size:28px; line-height:1.2; margin-bottom:20px; }
+  .featureCard .featureImageWrap { position:static; transform:none; width:100%; height:220px; margin:0 auto; }
+  .featureCard .featureCopy { position:static; width:auto; height:auto; padding:18px 0 0; }
+  .featureCard .featureCopy h2,.featureCard .featureCopy p { width:auto; }
+  .featureCard .featureCopy h2 { font-size:26px; line-height:1.2; }
+  .featureCard .featureCopy p { font-size:17px; line-height:1.5; margin-top:8px; }
+  .featureCard .readLink { position:static; display:flex; width:max-content; margin:14px 0 0 auto; min-height:30px; padding:4px 12px; }
+  .carouselControls { position:static; transform:none; width:100%; height:48px; }
+  .dots { gap:0; }
+  .dot,.dotActive { width:44px; height:44px; border:0; background:transparent; display:grid; place-items:center; }
+  .dot::after,.dotActive::after { content:""; width:10px; height:10px; border-radius:50%; border:1px solid #5c4326; }
+  .dotActive::after { background:#5c4326; }
+  .discoverCopy { min-height:0; padding:20px; }
+  .discoverCopy p { margin-top:16px; font-size:17px; line-height:1.5; }
+  .discoverCopy span { position:static; width:max-content; margin:16px 0 0 auto; min-height:30px; padding:4px 12px; }
+  .discoverImageWrap { height:180px; }
+  .insightsFrame { width:100%; grid-template-columns:minmax(0,1fr); gap:24px; margin-top:32px; min-height:0; }
+  .discussionPanel,.statisticsPanel { min-height:0; padding-bottom:48px; }
+  .discussionItem h3 { overflow-wrap:anywhere; font-size:22px; }
+  .discussionItem p { font-size:16px; line-height:1.5; overflow-wrap:anywhere; }
+  .discussionItem small { font-size:13px; line-height:1.5; }
+  .homeStatsLink { padding:16px 12px; }
+  .homeStatsOverview { flex-wrap:wrap; }
+  .homeStatsOverview svg { width:100px; }
+  .homeStatsOverview>div { flex:1 1 130px; min-width:0; }
+  .panelLink { min-height:36px; padding:6px 12px; }
+  .searchBar input { font-size:max(16px,1rem); }
+  .searchSubmit { min-width:44px; min-height:44px; }
+  .expandedSearchMenu { max-height:50dvh; }
+  .copyrightStrip { height:auto; min-height:65px; padding:16px; text-align:center; }
+  .footerArt { padding:28px 0; }
+  .footerOverlay { font-size:16px; overflow-wrap:anywhere; }
+  .footerOverlay a { display:inline-flex; align-items:center; min-height:44px; }
+}
+@media (min-width:481px) and (max-width:760px) {
+  .sideColumn { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+  .cardBody { padding:12px; }
+  .cardBody h2 { font-size:23px; }
+}
+@media (min-width:761px) and (max-width:1180px) {
+  .editorialCard,.cardImageWrap { width:100%; }
+}

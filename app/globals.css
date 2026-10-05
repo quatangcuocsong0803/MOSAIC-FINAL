@@ -463,3 +463,19 @@ html[data-reduced-motion="true"] a:hover, html[data-reduced-motion="true"] artic
 @media(prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
 }
+
+/* Mobile form fields stay readable without triggering iOS input zoom. */
+@media (max-width:767px) {
+  main { min-width:0; }
+  main :is(p,h1,h2,h3) { overflow-wrap:anywhere; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select { font-size:max(16px,1rem); }
+  .mosaic-card { padding:24px 18px; }
+  .mosaic-header { flex-wrap:wrap; gap:12px; }
+  .mosaic-progress-header { flex-wrap:wrap; gap:6px; }
+  .mosaic-profile-dialog { padding:12px; padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+  .mosaic-profile-dialog>div { max-height:calc(100dvh - 24px); }
+  .mosaic-profile-dialog button { min-height:44px; }
+  .mosaic-profile-dialog form>div:last-child { flex-wrap:wrap; }
+  .mosaic-messages-shell { height:max(260px,calc(100dvh - 156px)); min-height:0; border-radius:16px; }
+  .mosaic-chat-composer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+}

@@ -29,3 +29,20 @@
 
 .factGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }.factGrid article { padding:22px;background:#fbf7ef;border:1px solid #e2d4b7;border-radius:16px; }.factGrid h3 { font:600 18px var(--font-serif); }.factGrid strong { display:block;margin-top:10px;color:#547f7a;font-size:14px; }.factGrid p { margin-top:8px;font-size:12px;color:#847461;line-height:1.8; }
 @media(max-width:650px) { .factGrid { grid-template-columns:1fr; } }
+
+@media (max-width:720px) {
+  .hero,.chartHeading,.filters { min-width:0; }
+  .filters label,.filterLabel { min-width:0; max-width:100%; }
+  .filters select,.filterLabel select { width:100%; min-width:0; max-width:100%; min-height:44px; font-size:max(16px,1rem); }
+  .chartToolbar button,.secondaryButton { min-height:44px; }
+  .legend { gap:8px; }
+  .legend button { min-height:44px; padding:6px; text-align:left; }
+  .plotScroll,.tableScroll { max-width:100%; overscroll-behavior-x:contain; scrollbar-width:thin; }
+  .plotScroll svg { max-height:none; }
+  .donutLegend { max-height:none; }
+  .donutLegend li { min-height:36px; font-size:14px; }
+  .tooltip,.footnote { font-size:13px; overflow-wrap:anywhere; }
+  .metric { min-width:0; padding:14px 12px; }
+  .metric span,.metric small { overflow-wrap:anywhere; }
+  .chartHeading>div { min-width:0; }
+}
