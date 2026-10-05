@@ -1,9 +1,2 @@
-import { SignUp } from "@clerk/nextjs";
-
-export default function SignUpPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <SignUp />
-    </div>
-  );
-}
+import AuthScreen from '@/src/components/auth/AuthScreen';
+export default function Page() { return <AuthScreen mode="sign-up" />; }

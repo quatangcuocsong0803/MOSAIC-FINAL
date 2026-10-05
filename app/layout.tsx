@@ -5,6 +5,7 @@ import NavigationFeedback from "@/src/components/navigation/NavigationFeedback";
 import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from "next";
 import { Playfair_Display } from "next/font/google";
+import RememberReturn from '@/src/components/auth/RememberReturn';
 import Navbar from "@/src/components/Navbar";
 import ProfileOnboardingModal from "@/src/components/ProfileOnboardingModal";
 
@@ -25,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/">
       <html lang="vi" className={`bg-[#FCFBF8] ${playfair.variable}`}>
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -92,6 +93,7 @@ export default function RootLayout({
 
           <DisplayPreferences />
           <Suspense fallback={null}><NavigationFeedback /></Suspense>
+          <RememberReturn />
           <Navbar />
           <ProfileOnboardingModal />
           <main className="w-full flex flex-col items-center relative z-10 bg-transparent">{children}</main>

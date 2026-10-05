@@ -969,3 +969,5 @@
   .headerHome .mobilePanelOpen { max-height:calc(100dvh - 194px); }
 }
 @media (hover:none) { .notificationDelete { opacity:1; } }
+
+.utilityContactLinks {display:flex;align-items:center;gap:6px;margin-right:auto;height:100%;}

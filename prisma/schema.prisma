@@ -866,3 +866,21 @@ model UserSettings {
   revision              Int @default(0)
   updatedAt             DateTime @default(now()) @updatedAt
 }
+
+// Opt-in community map. One current submission per authenticated member.
+model CommunityMapShare {
+ clerkId String @id
+ countryCode String
+ mbti String?
+ enneagram String?
+ updatedAt DateTime @default(now()) @updatedAt
+ @@index([countryCode])
+}
+// Searches are counted once per member, article and UTC day; no raw query stored.
+model KnowledgeSearchDaily {
+ clerkId String
+ href String
+ day String
+ @@id([clerkId, href, day])
+ @@index([href])
+}

@@ -473,6 +473,10 @@ export default function UtilityBar() {
           styles.utilityBarInner
         }
       >
+        <div className={styles.utilityContactLinks} aria-label="Góp ý và liên hệ">
+          <Link href="/feedback" className={styles.utilityIconButton} title="Phản hồi của người dùng" aria-label="Phản hồi của người dùng"><svg className={styles.utilityIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg></Link>
+          <Link href="/contact" className={styles.utilityIconButton} title="Liên hệ" aria-label="Liên hệ"><svg className={styles.utilityIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M5 3h4l2 5-3 2c2 3 3 4 6 6l2-3 5 2v4c0 2-2 3-4 2C10 19 5 14 3 7 2 5 3 3 5 3Z"/></svg></Link>
+        </div>
         <div
           className={
             styles.utilityActions

@@ -78,6 +78,13 @@ export default function Navbar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  function goToSignIn(event: React.MouseEvent<HTMLAnchorElement>) {
+    if(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    closeMenu();
+    window.location.assign(`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`);
+  }
+
   function closeMenu() {
     setOpen(false);
   }
@@ -382,8 +389,9 @@ export default function Navbar() {
         <div className={styles.desktopActions}>
           {!isSignedIn ? (
             <Link
-              href="/sign-in"
+              href={`/sign-in?redirect_url=${encodeURIComponent(pathname)}`} prefetch={false}
               className={styles.signIn}
+              onClick={goToSignIn}
             >
               Sign in
             </Link>
@@ -526,9 +534,9 @@ export default function Navbar() {
 
           {!isSignedIn ? (
             <Link
-              href="/sign-in"
+              href={`/sign-in?redirect_url=${encodeURIComponent(pathname)}`} prefetch={false}
               className={styles.mobileSignIn}
-              onClick={closeMenu}
+              onClick={goToSignIn}
             >
               Sign in
             </Link>

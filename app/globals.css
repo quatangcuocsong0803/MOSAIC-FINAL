@@ -479,3 +479,5 @@ html[data-reduced-motion="true"] a:hover, html[data-reduced-motion="true"] artic
   .mosaic-messages-shell { height:max(260px,calc(100dvh - 156px)); min-height:0; border-radius:16px; }
   .mosaic-chat-composer { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
 }
+
+.mosaic-map-shortcut{font-family:var(--font-serif),Georgia,serif;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:34px 38px;margin:35px auto 55px;max-width:1120px;width:calc(100% - 32px);border:1px solid #cbb795;background:linear-gradient(115deg,#eee4d5ef,#faf6edef);color:#4a3f35}.mosaic-map-shortcut span{font-size:10px;letter-spacing:2px;color:#8b7355}.mosaic-map-shortcut h2{font-size:26px;margin:14px 0}.mosaic-map-shortcut p{font-size:14px;line-height:1.8}.mosaic-map-shortcut strong{font-size:14px;white-space:nowrap}@media(max-width:640px){.mosaic-map-shortcut{flex-direction:column;align-items:flex-start;padding:25px}.mosaic-map-shortcut h2{font-size:23px}}

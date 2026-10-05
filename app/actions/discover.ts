@@ -20,6 +20,10 @@ export interface DiscoverUserItem {
   clerkId: string;
   username: string | null;
   createdAt: Date;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  hobbies?: string | null;
+  location?: string | null;
 
   /**
    * Giữ shape cũ để UserCard hiện tại không bị vỡ.
@@ -368,6 +372,10 @@ export async function getDiscoverUsers(): Promise<GetDiscoverUsersResponse> {
           clerkId: user.clerkId,
           username: user.username,
           createdAt: user.createdAt,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+          hobbies: user.hobbies,
+          location: user.location,
 
           testResults:
             publicPersonalityResults,

@@ -1,3 +1,4 @@
+import HomeAtlas from '@/src/components/home/HomeAtlas';
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { HomeDiscussion, HomeStatistics, InsightsSkeleton } from "@/src/components/home/HomeInsights";
@@ -132,6 +133,7 @@ export default function HomePage() {
         <KnowledgeShowcase />
       </div>
 
+      <Suspense fallback={<div className="mosaic-map-shortcut" role="status">Đang tải bản đồ cộng đồng…</div>}><HomeAtlas /></Suspense>
       <HomeFooter />
     </div>
   );
