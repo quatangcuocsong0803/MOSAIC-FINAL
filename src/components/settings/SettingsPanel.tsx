@@ -55,7 +55,7 @@ export default function SettingsPanel({ initialProfile, initialSettings, clerkId
     <section id="account" className={styles.card}><h2>Tài khoản & bảo mật</h2><p>Quản lý email, phương thức đăng nhập và phiên đăng nhập trong phần quản lý tài khoản Clerk. Các lựa chọn bảo mật phụ thuộc vào phương thức đăng nhập đang dùng.</p><div className={styles.actions}><button type="button" onClick={() => openUserProfile()}>Quản lý tài khoản & bảo mật</button><Link href="/profile/blocked">Người dùng đã chặn →</Link><SignOutButton redirectUrl="/"><button type="button" className={styles.secondary}>Đăng xuất</button></SignOutButton></div></section>
     <section id="profile" className={styles.card}><h2>Hồ sơ & hình ảnh</h2><div className={styles.profile}>
       {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Ảnh đại diện của bạn" className={styles.avatar} /> : <span className={styles.avatar} aria-hidden="true">{profile.username?.slice(0, 1).toUpperCase() || 'M'}</span>}
-      <div><strong>{profile.username || 'Thành viên MOSAIC'}</strong><p>Ảnh đại diện, giới thiệu, sở thích và thông tin hồ sơ.</p></div></div>
+      <div><strong>{profile.displayName || profile.username || 'Thành viên MOSAIC'}</strong><p>Ảnh đại diện, giới thiệu, sở thích và thông tin hồ sơ.</p></div></div>
       <div className={styles.actions}><button type="button" onClick={() => setEditing(true)}>Chỉnh sửa hồ sơ & ảnh</button><Link href="/profile">Xem hồ sơ & lựa chọn chia sẻ kết quả →</Link></div>
     </section>
     <form onSubmit={event => { event.preventDefault(); void save(); }}>

@@ -9,66 +9,47 @@ import { isBlockedBetween } from "@/lib/blocks";
 export async function getFriendProfile(targetUserId: string) {
   const { userId: clerkUserId } = await auth();
 
-  if (!clerkUserId) {
-    return {
-      success: false as const,
-      reason: "UNAUTHENTICATED" as const,
-    };
-  }
+  const currentUser = clerkUserId
+    ? await prisma.user.findUnique({
+        where: { clerkId: clerkUserId },
+        select: { id: true },
+      })
+    : null;
 
-  const currentUser = await prisma.user.findUnique({
-    where: {
-      clerkId: clerkUserId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!currentUser) {
-    return {
-      success: false as const,
-      reason: "CURRENT_USER_NOT_FOUND" as const,
-    };
-  }
-
-  if (currentUser.id === targetUserId) {
+  if (currentUser?.id === targetUserId) {
     return {
       success: false as const,
       reason: "SELF" as const,
     };
   }
 
-  if (
-    await isBlockedBetween(
-      currentUser.id,
-      targetUserId,
-    )
-  ) {
+  if (currentUser && (await isBlockedBetween(currentUser.id, targetUserId))) {
     return {
       success: false as const,
       reason: "NOT_FRIENDS" as const,
     };
   }
 
-  const friendship = await prisma.friendship.findFirst({
-    where: {
-      status: "ACCEPTED",
-      OR: [
-        {
-          senderId: currentUser.id,
-          receiverId: targetUserId,
+  const friendship = currentUser
+    ? await prisma.friendship.findFirst({
+        where: {
+          status: "ACCEPTED",
+          OR: [
+            {
+              senderId: currentUser.id,
+              receiverId: targetUserId,
+            },
+            {
+              senderId: targetUserId,
+              receiverId: currentUser.id,
+            },
+          ],
         },
-        {
-          senderId: targetUserId,
-          receiverId: currentUser.id,
+        select: {
+          id: true,
         },
-      ],
-    },
-    select: {
-      id: true,
-    },
-  });
+      })
+    : null;
 
   const profile = await prisma.user.findUnique({
     where: {

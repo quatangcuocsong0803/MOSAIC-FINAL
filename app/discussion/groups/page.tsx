@@ -1,3 +1,4 @@
+import {identitySelect,identityForViewer} from "@/lib/profile-identity";
 import {
   auth,
 } from "@clerk/nextjs/server";
@@ -109,6 +110,7 @@ export default async function DiscussionGroupsPage() {
 
         creator: {
           select: {
+ ...identitySelect,
             username:
               true,
 
@@ -118,6 +120,9 @@ export default async function DiscussionGroupsPage() {
         },
       },
     });
+
+  const identity = await identityForViewer(currentUser?.id);
+  for(const group of groups) Object.assign(group.creator,identity(group.creator));
 
   const ids =
     groups.map(

@@ -3,7 +3,11 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { birthFacts, PRIVATE_FIELDS, type VisibilitySettings } from "@/lib/profile-policy";
+import {
+  birthFacts,
+  PRIVATE_FIELDS,
+  type VisibilitySettings,
+} from "@/lib/profile-policy";
 import { INTEREST_CODES, interestLabels } from "@/lib/interests";
 import { validateExtraTypology, type TypologyInput } from "@/lib/typology";
 import { formatMid } from "@/lib/mid";
@@ -134,54 +138,28 @@ const HEART_TYPES = new Set([2, 3, 4]);
 const HEAD_TYPES = new Set([5, 6, 7]);
 const GUT_TYPES = new Set([8, 9, 1]);
 
-function normalizeMbtiType(
-  value: string
-): string | null {
-  const normalized = value
-    .trim()
-    .toUpperCase();
+function normalizeMbtiType(value: string): string | null {
+  const normalized = value.trim().toUpperCase();
 
-  return ALL_MBTI_TYPES.has(normalized)
-    ? normalized
-    : null;
+  return ALL_MBTI_TYPES.has(normalized) ? normalized : null;
 }
 
-function normalizeEnneagramCore(
-  value: string | number
-): number | null {
+function normalizeEnneagramCore(value: string | number): number | null {
   if (typeof value === "number") {
-    return Number.isInteger(value) &&
-      value >= 1 &&
-      value <= 9
-      ? value
-      : null;
+    return Number.isInteger(value) && value >= 1 && value <= 9 ? value : null;
   }
 
-  const normalized = value
-    .trim()
-    .toUpperCase();
+  const normalized = value.trim().toUpperCase();
 
-  const match = normalized.match(
-    /^(?:TYPE\s*)?([1-9])$/
-  );
+  const match = normalized.match(/^(?:TYPE\s*)?([1-9])$/);
 
-  return match
-    ? Number(match[1])
-    : null;
+  return match ? Number(match[1]) : null;
 }
 
-function normalizeEnneagramWing(
-  core: number,
-  value: string
-): string | null {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "");
+function normalizeEnneagramWing(core: number, value: string): string | null {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
 
-  const match = normalized.match(
-    /^([1-9])w([1-9])$/
-  );
+  const match = normalized.match(/^([1-9])w([1-9])$/);
 
   if (!match) {
     return null;
@@ -194,9 +172,7 @@ function normalizeEnneagramWing(
     return null;
   }
 
-  if (
-    !ENNEAGRAM_WINGS[core]?.includes(wing)
-  ) {
+  if (!ENNEAGRAM_WINGS[core]?.includes(wing)) {
     return null;
   }
 
@@ -215,13 +191,8 @@ function normalizeEnneagramWing(
  *
  * Core phải xuất hiện đúng tại center của nó.
  */
-function normalizeEnneagramTritype(
-  core: number,
-  value: string
-): string | null {
-  const normalized = value
-    .trim()
-    .replace(/\D/g, "");
+function normalizeEnneagramTritype(core: number, value: string): string | null {
+  const normalized = value.trim().replace(/\D/g, "");
 
   if (normalized.length !== 3) {
     return null;
@@ -231,85 +202,57 @@ function normalizeEnneagramTritype(
   const head = Number(normalized[1]);
   const gut = Number(normalized[2]);
 
-  if (
-    !HEART_TYPES.has(heart) ||
-    !HEAD_TYPES.has(head) ||
-    !GUT_TYPES.has(gut)
-  ) {
+  if (!HEART_TYPES.has(heart) || !HEAD_TYPES.has(head) || !GUT_TYPES.has(gut)) {
     return null;
   }
 
-  if (
-    HEART_TYPES.has(core) &&
-    heart !== core
-  ) {
+  if (HEART_TYPES.has(core) && heart !== core) {
     return null;
   }
 
-  if (
-    HEAD_TYPES.has(core) &&
-    head !== core
-  ) {
+  if (HEAD_TYPES.has(core) && head !== core) {
     return null;
   }
 
-  if (
-    GUT_TYPES.has(core) &&
-    gut !== core
-  ) {
+  if (GUT_TYPES.has(core) && gut !== core) {
     return null;
   }
 
   return `${heart}${head}${gut}`;
 }
 
-function extractEnneagramCoreFromResult(
-  raw: string
-): number | null {
+function extractEnneagramCoreFromResult(raw: string): number | null {
   const match = raw.match(/[1-9]/);
 
-  return match
-    ? Number(match[0])
-    : null;
+  return match ? Number(match[0]) : null;
 }
 
 function extractEnneagramWingFromText(
   core: number,
-  raw: string
+  raw: string,
 ): string | null {
-  const match = raw.match(
-    /\b([1-9])\s*[wW]\s*([1-9])\b/
-  );
+  const match = raw.match(/\b([1-9])\s*[wW]\s*([1-9])\b/);
 
   if (!match) {
     return null;
   }
 
-  return normalizeEnneagramWing(
-    core,
-    `${match[1]}w${match[2]}`
-  );
+  return normalizeEnneagramWing(core, `${match[1]}w${match[2]}`);
 }
 
 function extractEnneagramTritypeFromText(
   core: number,
-  raw: string
+  raw: string,
 ): string | null {
   // Ưu tiên code đúng format project: Heart → Head → Gut.
-  const matches = raw.match(
-    /\b[234][567][891]\b/g
-  );
+  const matches = raw.match(/\b[234][567][891]\b/g);
 
   if (!matches) {
     return null;
   }
 
   for (const candidate of matches) {
-    const valid =
-      normalizeEnneagramTritype(
-        core,
-        candidate
-      );
+    const valid = normalizeEnneagramTritype(core, candidate);
 
     if (valid) {
       return valid;
@@ -319,23 +262,20 @@ function extractEnneagramTritypeFromText(
   return null;
 }
 
-async function getOrCreateCurrentUser(
-  clerkId: string
-) {
-  let user =
-    await prisma.user.findUnique({
-      where: {
-        clerkId,
-      },
+async function getOrCreateCurrentUser(clerkId: string) {
+  let user = await prisma.user.findUnique({
+    where: {
+      clerkId,
+    },
 
-      include: {
-        testResults: {
-          orderBy: {
-            createdAt: "desc",
-          },
+    include: {
+      testResults: {
+        orderBy: {
+          createdAt: "desc",
         },
       },
-    });
+    },
+  });
 
   if (user) {
     return user;
@@ -343,14 +283,15 @@ async function getOrCreateCurrentUser(
 
   const clerkUser = await currentUser();
   await ensureUser(clerkId, clerkUser?.fullName);
-  user = await prisma.user.findUniqueOrThrow({where:{clerkId},include:{testResults:{orderBy:{createdAt:"desc"}}}});
+  user = await prisma.user.findUniqueOrThrow({
+    where: { clerkId },
+    include: { testResults: { orderBy: { createdAt: "desc" } } },
+  });
 
   return user;
 }
 
-function serializeUserProfile(
-  user: any
-): UserProfileData {
+function serializeUserProfile(user: any): UserProfileData {
   return {
     id: user.id,
     clerkId: user.clerkId,
@@ -364,7 +305,9 @@ function serializeUserProfile(
     sloanType: user.sloanType,
     displayName: user.displayName ?? user.username,
     interestCodes: user.interestCodes ?? [],
-    visibility: Object.fromEntries(PRIVATE_FIELDS.map(field => [field, user[`${field}Visibility`]])) as VisibilitySettings,
+    visibility: Object.fromEntries(
+      PRIVATE_FIELDS.map((field) => [field, user[`${field}Visibility`]]),
+    ) as VisibilitySettings,
     age: birthFacts(user.dateOfBirth).age,
     onboardingStep: user.onboardingStep,
     onboardingCompletedAt: user.onboardingCompletedAt,
@@ -373,53 +316,33 @@ function serializeUserProfile(
     hobbies: user.hobbies,
     location: user.location,
     bio: user.bio,
-    avatarUrl:
-      user.avatarUrl ?? null,
+    avatarUrl: user.avatarUrl ?? null,
 
-    manualMbtiType:
-      user.manualMbtiType ?? null,
+    manualMbtiType: user.manualMbtiType ?? null,
 
-    manualEnneagramType:
-      user.manualEnneagramType ?? null,
+    manualEnneagramType: user.manualEnneagramType ?? null,
 
-    manualEnneagramWing:
-      user.manualEnneagramWing ?? null,
+    manualEnneagramWing: user.manualEnneagramWing ?? null,
 
-    manualEnneagramTritype:
-      user.manualEnneagramTritype ?? null,
+    manualEnneagramTritype: user.manualEnneagramTritype ?? null,
 
-    confirmedMbtiType:
-      user.confirmedMbtiType ?? null,
+    confirmedMbtiType: user.confirmedMbtiType ?? null,
 
-    confirmedMbtiSource:
-      user.confirmedMbtiSource ?? null,
+    confirmedMbtiSource: user.confirmedMbtiSource ?? null,
 
-    confirmedMbtiTestResultId:
-      user.confirmedMbtiTestResultId ??
-      null,
+    confirmedMbtiTestResultId: user.confirmedMbtiTestResultId ?? null,
 
-    confirmedEnneagramType:
-      user.confirmedEnneagramType ??
-      null,
+    confirmedEnneagramType: user.confirmedEnneagramType ?? null,
 
-    confirmedEnneagramWing:
-      user.confirmedEnneagramWing ??
-      null,
+    confirmedEnneagramWing: user.confirmedEnneagramWing ?? null,
 
-    confirmedEnneagramTritype:
-      user.confirmedEnneagramTritype ??
-      null,
+    confirmedEnneagramTritype: user.confirmedEnneagramTritype ?? null,
 
-    confirmedEnneagramSource:
-      user.confirmedEnneagramSource ??
-      null,
+    confirmedEnneagramSource: user.confirmedEnneagramSource ?? null,
 
-    confirmedEnneagramTestResultId:
-      user.confirmedEnneagramTestResultId ??
-      null,
+    confirmedEnneagramTestResultId: user.confirmedEnneagramTestResultId ?? null,
 
-    testResults:
-      user.testResults || [],
+    testResults: user.testResults || [],
   };
 }
 
@@ -439,39 +362,27 @@ export async function getUserProfile(): Promise<{
   error?: string;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Chưa đăng nhập",
+        error: "Chưa đăng nhập",
       };
     }
 
-    const user =
-      await getOrCreateCurrentUser(
-        userId
-      );
+    const user = await getOrCreateCurrentUser(userId);
 
     return {
       success: true,
-      profile:
-        serializeUserProfile(
-          user
-        ),
+      profile: serializeUserProfile(user),
     };
   } catch (error) {
-    console.error(
-      "Lỗi khi lấy thông tin profile:",
-      error
-    );
+    console.error("Lỗi khi lấy thông tin profile:", error);
 
     return {
       success: false,
-      error:
-        "Không thể lấy thông tin profile.",
+      error: "Không thể lấy thông tin profile.",
     };
   }
 }
@@ -493,63 +404,48 @@ export async function getConfirmedPersonalityIdentity(): Promise<{
   error?: string;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Chưa đăng nhập",
+        error: "Chưa đăng nhập",
       };
     }
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          clerkId: userId,
-        },
+    const user = await prisma.user.findUnique({
+      where: {
+        clerkId: userId,
+      },
 
-        select: {
-          confirmedMbtiType: true,
+      select: {
+        confirmedMbtiType: true,
 
-          confirmedEnneagramType: true,
-          confirmedEnneagramWing: true,
-          confirmedEnneagramTritype: true,
-        },
-      });
+        confirmedEnneagramType: true,
+        confirmedEnneagramWing: true,
+        confirmedEnneagramTritype: true,
+      },
+    });
 
     return {
       success: true,
 
       identity: {
-        mbtiType:
-          user?.confirmedMbtiType ??
-          null,
+        mbtiType: user?.confirmedMbtiType ?? null,
 
-        enneagramType:
-          user?.confirmedEnneagramType ??
-          null,
+        enneagramType: user?.confirmedEnneagramType ?? null,
 
-        enneagramWing:
-          user?.confirmedEnneagramWing ??
-          null,
+        enneagramWing: user?.confirmedEnneagramWing ?? null,
 
-        enneagramTritype:
-          user?.confirmedEnneagramTritype ??
-          null,
+        enneagramTritype: user?.confirmedEnneagramTritype ?? null,
       },
     };
   } catch (error) {
-    console.error(
-      "Lỗi lấy confirmed personality identity:",
-      error
-    );
+    console.error("Lỗi lấy confirmed personality identity:", error);
 
     return {
       success: false,
-      error:
-        "Không thể lấy personality identity.",
+      error: "Không thể lấy personality identity.",
     };
   }
 }
@@ -558,224 +454,193 @@ export async function getConfirmedPersonalityIdentity(): Promise<{
  * Cập nhật các field profile cơ bản.
  */
 export async function updateUserProfile(
-  dataOrFormData:
-    | UpdateUserProfileInput
-    | FormData
+  dataOrFormData: UpdateUserProfileInput | FormData,
 ): Promise<{
   success: boolean;
   error?: string;
   profile?: UserProfileData;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Bạn chưa đăng nhập.",
+        error: "Bạn chưa đăng nhập.",
       };
     }
 
-    let input: UpdateUserProfileInput =
-      {};
+    let input: UpdateUserProfileInput = {};
 
-    if (
-      dataOrFormData &&
-      typeof (dataOrFormData as any)
-        .get === "function"
-    ) {
-      const fd =
-        dataOrFormData as FormData;
+    if (dataOrFormData && typeof (dataOrFormData as any).get === "function") {
+      const fd = dataOrFormData as FormData;
 
-      const pick = (
-        key: string
-      ) =>
-        fd.has(key)
-          ? ((fd.get(
-              key
-            ) as string) ||
-              null)
-          : undefined;
+      const pick = (key: string) =>
+        fd.has(key) ? (fd.get(key) as string) || null : undefined;
 
       input = {
-        dateOfBirth:
-          pick("dateOfBirth"),
+        dateOfBirth: pick("dateOfBirth"),
 
-        zodiacSign:
-          pick("zodiacSign"),
+        zodiacSign: pick("zodiacSign"),
 
-        hobbies:
-          pick("hobbies"),
+        hobbies: pick("hobbies"),
 
-        location:
-          pick("location"),
+        location: pick("location"),
 
-        bio:
-          pick("bio"),
+        bio: pick("bio"),
 
-        avatarUrl:
-          pick("avatarUrl"),
+        avatarUrl: pick("avatarUrl"),
       };
-    } else if (
-      dataOrFormData &&
-      typeof dataOrFormData ===
-        "object"
-    ) {
-      input =
-        dataOrFormData as UpdateUserProfileInput;
+    } else if (dataOrFormData && typeof dataOrFormData === "object") {
+      input = dataOrFormData as UpdateUserProfileInput;
     }
 
-    const trimOrNull = (
-      value:
-        | string
-        | null
-        | undefined
-    ) =>
-      value &&
-      value.trim().length > 0
-        ? value.trim()
-        : null;
+    for (const [field, limit] of [
+      ["bio", 2000],
+      ["hobbies", 1000],
+      ["location", 160],
+      ["avatarUrl", 2048],
+    ] as const) {
+      const value = input[field];
+      if (
+        value !== undefined &&
+        value !== null &&
+        (typeof value !== "string" || value.length > limit)
+      )
+        return {
+          success: false,
+          error: "Thông tin hồ sơ quá dài hoặc không hợp lệ.",
+        };
+    }
+    if (input.avatarUrl) {
+      try {
+        const url = new URL(input.avatarUrl);
+        if (url.protocol !== "https:")
+          return { success: false, error: "Đường dẫn ảnh cần sử dụng HTTPS." };
+      } catch {
+        return { success: false, error: "Đường dẫn ảnh không hợp lệ." };
+      }
+    }
+    const trimOrNull = (value: string | null | undefined) =>
+      value && value.trim().length > 0 ? value.trim() : null;
 
-    const data: Record<
-      string,
-      unknown
-    > = {};
+    const data: Record<string, unknown> = {};
+    const existingUser = await getOrCreateCurrentUser(userId);
 
-    if (
-      input.dateOfBirth !==
-      undefined
-    ) {
-      let parsedDob:
-        | Date
-        | null = null;
+    if (input.dateOfBirth !== undefined) {
+      let parsedDob: Date | null = null;
 
       if (input.dateOfBirth) {
-        const date =
-          new Date(
-            input.dateOfBirth
-          );
-
         if (
-          !isNaN(
-            date.getTime()
-          )
-) {
-          if (date > new Date() || date.getUTCFullYear() < 1900) return {success:false,error:"Ngày sinh không hợp lệ."};
+          typeof input.dateOfBirth === "string" &&
+          (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateOfBirth) ||
+            new Date(input.dateOfBirth).toISOString().slice(0, 10) !==
+              input.dateOfBirth)
+        )
+          return { success: false, error: "Ngày sinh không hợp lệ." };
+        const date = new Date(input.dateOfBirth);
+
+        if (!isNaN(date.getTime())) {
+          if (date > new Date() || date.getUTCFullYear() < 1900)
+            return { success: false, error: "Ngày sinh không hợp lệ." };
           parsedDob = date;
-        } else return {success:false,error:"Ngày sinh không hợp lệ."};
+        } else return { success: false, error: "Ngày sinh không hợp lệ." };
       }
 
-      data.dateOfBirth =
-        parsedDob;
+      data.dateOfBirth = parsedDob;
     }
 
     // Ignore client-supplied zodiac; derive it from DOB only.
-    if (input.dateOfBirth !== undefined) data.zodiacSign = birthFacts(data.dateOfBirth as Date | null).zodiacSign;
-    if (input.username !== undefined) {
+    if (input.dateOfBirth !== undefined)
+      data.zodiacSign = birthFacts(data.dateOfBirth as Date | null).zodiacSign;
+    if (
+      input.username !== undefined &&
+      input.username !== existingUser.username
+    ) {
       const username = input.username?.trim().toLowerCase();
-      if (!username || !/^[a-z0-9_]{3,30}$/.test(username)) return {success:false,error:"Username cần 3–30 chữ cái, số hoặc dấu gạch dưới."};
+      if (!username || !/^[a-z0-9_]{3,30}$/.test(username))
+        return {
+          success: false,
+          error: "Username cần 3–30 chữ cái, số hoặc dấu gạch dưới.",
+        };
       data.username = username;
     }
     if (input.displayName !== undefined) {
       const name = input.displayName?.trim();
-      if (!name || name.length > 80) return {success:false,error:"Tên hiển thị cần 1–80 ký tự."};
+      if (!name || name.length > 80)
+        return { success: false, error: "Tên hiển thị cần 1–80 ký tự." };
       data.displayName = name;
     }
     if (input.interestCodes !== undefined) {
-      if (!Array.isArray(input.interestCodes) || input.interestCodes.length > 50 || input.interestCodes.some(code => typeof code !== 'string' || !INTEREST_CODES.has(code))) return {success:false,error:"Sở thích không hợp lệ."};
+      if (
+        !Array.isArray(input.interestCodes) ||
+        input.interestCodes.length > 50 ||
+        input.interestCodes.some(
+          (code) => typeof code !== "string" || !INTEREST_CODES.has(code),
+        )
+      )
+        return { success: false, error: "Sở thích không hợp lệ." };
       data.interestCodes = [...new Set(input.interestCodes)];
-      data.hobbies = interestLabels(data.interestCodes as string[]) || null;
+      if (input.interestCodes.length || existingUser.interestCodes.length)
+        data.hobbies = interestLabels(data.interestCodes as string[]) || null;
     }
     if (input.visibility !== undefined) {
-      if (!input.visibility || typeof input.visibility !== 'object') return {success:false,error:"Quyền hiển thị không hợp lệ."};
+      if (!input.visibility || typeof input.visibility !== "object")
+        return { success: false, error: "Quyền hiển thị không hợp lệ." };
       for (const [field, value] of Object.entries(input.visibility)) {
-        if (!(PRIVATE_FIELDS as readonly string[]).includes(field) || !['PUBLIC','FRIENDS','PRIVATE'].includes(value)) return {success:false,error:"Quyền hiển thị không hợp lệ."};
+        if (
+          !(PRIVATE_FIELDS as readonly string[]).includes(field) ||
+          !["PUBLIC", "FRIENDS", "PRIVATE"].includes(value)
+        )
+          return { success: false, error: "Quyền hiển thị không hợp lệ." };
         data[`${field}Visibility`] = value;
       }
     }
-    if (
-      input.hobbies !==
-      undefined && input.interestCodes === undefined
-    ) {
-      data.hobbies =
-        trimOrNull(
-          input.hobbies
-        );
+    if (input.hobbies !== undefined && input.interestCodes === undefined) {
+      data.hobbies = trimOrNull(input.hobbies);
     }
 
-    if (
-      input.location !==
-      undefined
-    ) {
-      data.location =
-        trimOrNull(
-          input.location
-        );
+    if (input.location !== undefined) {
+      data.location = trimOrNull(input.location);
     }
 
-    if (
-      input.bio !==
-      undefined
-    ) {
-      data.bio =
-        trimOrNull(
-          input.bio
-        );
+    if (input.bio !== undefined) {
+      data.bio = trimOrNull(input.bio);
     }
 
-    if (
-      input.avatarUrl !==
-      undefined
-    ) {
-      data.avatarUrl =
-        trimOrNull(
-          input.avatarUrl
-        );
+    if (input.avatarUrl !== undefined) {
+      data.avatarUrl = trimOrNull(input.avatarUrl);
     }
 
-    await getOrCreateCurrentUser(userId);
+    const updatedUser = await prisma.user.update({
+      where: { clerkId: userId },
+      data,
 
-    const updatedUser =
-      await prisma.user.update({
-        where: { clerkId: userId },
-        data,
-
-        include: {
-          testResults: {
-            orderBy: {
-              createdAt:
-                "desc",
-            },
+      include: {
+        testResults: {
+          orderBy: {
+            createdAt: "desc",
           },
         },
-      });
+      },
+    });
 
     revalidatePersonalityPaths();
 
     return {
       success: true,
 
-      profile:
-        serializeUserProfile(
-          updatedUser
-        ),
+      profile: serializeUserProfile(updatedUser),
     };
   } catch (error: any) {
-    if (error?.code === "P2002") return {success:false,error:"Username đã được sử dụng."};
-    console.error(
-      "Lỗi cập nhật profile:",
-      error
-    );
+    if (error?.code === "P2002")
+      return { success: false, error: "Username đã được sử dụng." };
+    console.error("Lỗi cập nhật profile:", error);
 
     return {
       success: false,
 
-      error:
-        error?.message
-          ? `Lỗi cập nhật profile: ${error.message}`
-          : "Có lỗi xảy ra khi cập nhật hồ sơ.",
+      error: "Có lỗi xảy ra khi cập nhật hồ sơ.",
     };
   }
 }
@@ -794,93 +659,61 @@ export async function updateUserProfile(
  * không âm thầm thay identity cho tới khi user xác nhận "Dùng thủ công".
  */
 export async function saveManualPersonalityTypes(
-  input: SaveManualPersonalityTypesInput
+  input: SaveManualPersonalityTypesInput,
 ): Promise<{
   success: boolean;
   profile?: UserProfileData;
   error?: string;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Bạn cần đăng nhập để cập nhật type.",
+        error: "Bạn cần đăng nhập để cập nhật type.",
       };
     }
 
-    const user =
-      await getOrCreateCurrentUser(
-        userId
-      );
+    const user = await getOrCreateCurrentUser(userId);
 
-    const data: Record<
-      string,
-      unknown
-    > = {};
+    const data: Record<string, unknown> = {};
 
     // ========================================================
     // MBTI
     // ========================================================
 
-    if (
-      input.mbtiType !==
-      undefined
-    ) {
-      const raw =
-        input.mbtiType?.trim() ??
-        "";
+    if (input.mbtiType !== undefined) {
+      const raw = input.mbtiType?.trim() ?? "";
 
       if (!raw) {
-        data.manualMbtiType =
-          null;
+        data.manualMbtiType = null;
 
-        if (
-          user.confirmedMbtiSource ===
-          "MANUAL"
-        ) {
-          data.confirmedMbtiType =
-            null;
+        if (user.confirmedMbtiSource === "MANUAL") {
+          data.confirmedMbtiType = null;
 
-          data.confirmedMbtiSource =
-            null;
+          data.confirmedMbtiSource = null;
 
-          data.confirmedMbtiTestResultId =
-            null;
+          data.confirmedMbtiTestResultId = null;
         }
       } else {
-        const mbti =
-          normalizeMbtiType(
-            raw
-          );
+        const mbti = normalizeMbtiType(raw);
 
         if (!mbti) {
           return {
             success: false,
-            error:
-              "MBTI không hợp lệ. Chỉ chấp nhận 1 trong 16 type chuẩn.",
+            error: "MBTI không hợp lệ. Chỉ chấp nhận 1 trong 16 type chuẩn.",
           };
         }
 
-        data.manualMbtiType =
-          mbti;
+        data.manualMbtiType = mbti;
 
-        if (
-          !user.confirmedMbtiType ||
-          user.confirmedMbtiSource ===
-            "MANUAL"
-        ) {
-          data.confirmedMbtiType =
-            mbti;
+        if (!user.confirmedMbtiType || user.confirmedMbtiSource === "MANUAL") {
+          data.confirmedMbtiType = mbti;
 
-          data.confirmedMbtiSource =
-            "MANUAL";
+          data.confirmedMbtiSource = "MANUAL";
 
-          data.confirmedMbtiTestResultId =
-            null;
+          data.confirmedMbtiTestResultId = null;
         }
       }
     }
@@ -890,56 +723,37 @@ export async function saveManualPersonalityTypes(
     // ========================================================
 
     const hasAnyEnneagramInput =
-      input.enneagramCore !==
-        undefined ||
-      input.enneagramWing !==
-        undefined ||
-      input.enneagramTritype !==
-        undefined;
+      input.enneagramCore !== undefined ||
+      input.enneagramWing !== undefined ||
+      input.enneagramTritype !== undefined;
 
     if (hasAnyEnneagramInput) {
-      const rawCore =
-        input.enneagramCore;
+      const rawCore = input.enneagramCore;
 
       if (
         rawCore === null ||
         rawCore === undefined ||
-        String(rawCore).trim() ===
-          ""
+        String(rawCore).trim() === ""
       ) {
-        data.manualEnneagramType =
-          null;
+        data.manualEnneagramType = null;
 
-        data.manualEnneagramWing =
-          null;
+        data.manualEnneagramWing = null;
 
-        data.manualEnneagramTritype =
-          null;
+        data.manualEnneagramTritype = null;
 
-        if (
-          user.confirmedEnneagramSource ===
-          "MANUAL"
-        ) {
-          data.confirmedEnneagramType =
-            null;
+        if (user.confirmedEnneagramSource === "MANUAL") {
+          data.confirmedEnneagramType = null;
 
-          data.confirmedEnneagramWing =
-            null;
+          data.confirmedEnneagramWing = null;
 
-          data.confirmedEnneagramTritype =
-            null;
+          data.confirmedEnneagramTritype = null;
 
-          data.confirmedEnneagramSource =
-            null;
+          data.confirmedEnneagramSource = null;
 
-          data.confirmedEnneagramTestResultId =
-            null;
+          data.confirmedEnneagramTestResultId = null;
         }
       } else {
-        const core =
-          normalizeEnneagramCore(
-            rawCore
-          );
+        const core = normalizeEnneagramCore(rawCore);
 
         if (!core) {
           return {
@@ -949,42 +763,23 @@ export async function saveManualPersonalityTypes(
           };
         }
 
-        let wing:
-          | string
-          | null = null;
+        let wing: string | null = null;
 
-        if (
-          input.enneagramWing &&
-          input.enneagramWing.trim()
-        ) {
-          wing =
-            normalizeEnneagramWing(
-              core,
-              input.enneagramWing
-            );
+        if (input.enneagramWing && input.enneagramWing.trim()) {
+          wing = normalizeEnneagramWing(core, input.enneagramWing);
 
           if (!wing) {
             return {
               success: false,
-              error:
-                `Wing không hợp lệ cho Type ${core}. Chỉ được chọn ${core}w${ENNEAGRAM_WINGS[core][0]} hoặc ${core}w${ENNEAGRAM_WINGS[core][1]}.`,
+              error: `Wing không hợp lệ cho Type ${core}. Chỉ được chọn ${core}w${ENNEAGRAM_WINGS[core][0]} hoặc ${core}w${ENNEAGRAM_WINGS[core][1]}.`,
             };
           }
         }
 
-        let tritype:
-          | string
-          | null = null;
+        let tritype: string | null = null;
 
-        if (
-          input.enneagramTritype &&
-          input.enneagramTritype.trim()
-        ) {
-          tritype =
-            normalizeEnneagramTritype(
-              core,
-              input.enneagramTritype
-            );
+        if (input.enneagramTritype && input.enneagramTritype.trim()) {
+          tritype = normalizeEnneagramTritype(core, input.enneagramTritype);
 
           if (!tritype) {
             return {
@@ -995,87 +790,65 @@ export async function saveManualPersonalityTypes(
           }
         }
 
-        data.manualEnneagramType =
-          `Type ${core}`;
+        data.manualEnneagramType = `Type ${core}`;
 
-        data.manualEnneagramWing =
-          wing;
+        data.manualEnneagramWing = wing;
 
-        data.manualEnneagramTritype =
-          tritype;
+        data.manualEnneagramTritype = tritype;
 
         if (
           !user.confirmedEnneagramType ||
-          user.confirmedEnneagramSource ===
-            "MANUAL"
+          user.confirmedEnneagramSource === "MANUAL"
         ) {
-          data.confirmedEnneagramType =
-            `Type ${core}`;
+          data.confirmedEnneagramType = `Type ${core}`;
 
-          data.confirmedEnneagramWing =
-            wing;
+          data.confirmedEnneagramWing = wing;
 
-          data.confirmedEnneagramTritype =
-            tritype;
+          data.confirmedEnneagramTritype = tritype;
 
-          data.confirmedEnneagramSource =
-            "MANUAL";
+          data.confirmedEnneagramSource = "MANUAL";
 
-          data.confirmedEnneagramTestResultId =
-            null;
+          data.confirmedEnneagramTestResultId = null;
         }
       }
     }
 
-    if (
-      Object.keys(data).length ===
-      0
-    ) {
+    if (Object.keys(data).length === 0) {
       return {
         success: false,
-        error:
-          "Không có personality type nào để cập nhật.",
+        error: "Không có personality type nào để cập nhật.",
       };
     }
 
-    const updated =
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
+    const updated = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
 
-        data,
+      data,
 
-        include: {
-          testResults: {
-            orderBy: {
-              createdAt:
-                "desc",
-            },
+      include: {
+        testResults: {
+          orderBy: {
+            createdAt: "desc",
           },
         },
-      });
+      },
+    });
 
     revalidatePersonalityPaths();
 
     return {
       success: true,
 
-      profile:
-        serializeUserProfile(
-          updated
-        ),
+      profile: serializeUserProfile(updated),
     };
   } catch (error) {
-    console.error(
-      "Lỗi lưu manual personality:",
-      error
-    );
+    console.error("Lỗi lưu manual personality:", error);
 
     return {
       success: false,
-      error:
-        "Không thể lưu personality thủ công lúc này.",
+      error: "Không thể lưu personality thủ công lúc này.",
     };
   }
 }
@@ -1084,122 +857,91 @@ export async function saveManualPersonalityTypes(
  * Dùng manual personality làm identity hiển thị.
  */
 export async function confirmManualPersonalityType(
-  kind: PersonalityKind
+  kind: PersonalityKind,
 ): Promise<{
   success: boolean;
   profile?: UserProfileData;
   error?: string;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Bạn cần đăng nhập để xác nhận type.",
+        error: "Bạn cần đăng nhập để xác nhận type.",
       };
     }
 
-    const user =
-      await getOrCreateCurrentUser(
-        userId
-      );
+    const user = await getOrCreateCurrentUser(userId);
 
-    let data: Record<
-      string,
-      unknown
-    >;
+    let data: Record<string, unknown>;
 
     if (kind === "MBTI") {
-      if (
-        !user.manualMbtiType
-      ) {
+      if (!user.manualMbtiType) {
         return {
           success: false,
-          error:
-            "Bạn chưa chọn MBTI thủ công.",
+          error: "Bạn chưa chọn MBTI thủ công.",
         };
       }
 
       data = {
-        confirmedMbtiType:
-          user.manualMbtiType,
+        confirmedMbtiType: user.manualMbtiType,
 
-        confirmedMbtiSource:
-          "MANUAL",
+        confirmedMbtiSource: "MANUAL",
 
-        confirmedMbtiTestResultId:
-          null,
+        confirmedMbtiTestResultId: null,
       };
     } else {
-      if (
-        !user.manualEnneagramType
-      ) {
+      if (!user.manualEnneagramType) {
         return {
           success: false,
-          error:
-            "Bạn chưa chọn Enneagram thủ công.",
+          error: "Bạn chưa chọn Enneagram thủ công.",
         };
       }
 
       data = {
-        confirmedEnneagramType:
-          user.manualEnneagramType,
+        confirmedEnneagramType: user.manualEnneagramType,
 
-        confirmedEnneagramWing:
-          user.manualEnneagramWing,
+        confirmedEnneagramWing: user.manualEnneagramWing,
 
-        confirmedEnneagramTritype:
-          user.manualEnneagramTritype,
+        confirmedEnneagramTritype: user.manualEnneagramTritype,
 
-        confirmedEnneagramSource:
-          "MANUAL",
+        confirmedEnneagramSource: "MANUAL",
 
-        confirmedEnneagramTestResultId:
-          null,
+        confirmedEnneagramTestResultId: null,
       };
     }
 
-    const updated =
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
+    const updated = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
 
-        data,
+      data,
 
-        include: {
-          testResults: {
-            orderBy: {
-              createdAt:
-                "desc",
-            },
+      include: {
+        testResults: {
+          orderBy: {
+            createdAt: "desc",
           },
         },
-      });
+      },
+    });
 
     revalidatePersonalityPaths();
 
     return {
       success: true,
 
-      profile:
-        serializeUserProfile(
-          updated
-        ),
+      profile: serializeUserProfile(updated),
     };
   } catch (error) {
-    console.error(
-      "Lỗi xác nhận manual personality:",
-      error
-    );
+    console.error("Lỗi xác nhận manual personality:", error);
 
     return {
       success: false,
-      error:
-        "Không thể xác nhận personality thủ công lúc này.",
+      error: "Không thể xác nhận personality thủ công lúc này.",
     };
   }
 }
@@ -1219,167 +961,122 @@ export async function confirmTestPersonalityType({
   error?: string;
 }> {
   try {
-    const { userId } =
-      await auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return {
         success: false,
-        error:
-          "Bạn cần đăng nhập để xác nhận type.",
+        error: "Bạn cần đăng nhập để xác nhận type.",
       };
     }
 
-    const normalizedId =
-      testResultId.trim();
+    const normalizedId = testResultId.trim();
 
     if (!normalizedId) {
       return {
         success: false,
-        error:
-          "TestResult không hợp lệ.",
+        error: "TestResult không hợp lệ.",
       };
     }
 
-    const user =
-      await getOrCreateCurrentUser(
-        userId
-      );
+    const user = await getOrCreateCurrentUser(userId);
 
-    const testResult =
-      await prisma.testResult.findFirst({
-        where: {
-          id: normalizedId,
-          userId: user.id,
-          testType: kind,
-        },
+    const testResult = await prisma.testResult.findFirst({
+      where: {
+        id: normalizedId,
+        userId: user.id,
+        testType: kind,
+      },
 
-        select: {
-          id: true,
-          resultName: true,
-          details: true,
-        },
-      });
+      select: {
+        id: true,
+        resultName: true,
+        details: true,
+      },
+    });
 
     if (!testResult) {
       return {
         success: false,
-        error:
-          "Không tìm thấy kết quả test phù hợp.",
+        error: "Không tìm thấy kết quả test phù hợp.",
       };
     }
 
-    let data: Record<
-      string,
-      unknown
-    >;
+    let data: Record<string, unknown>;
 
     if (kind === "MBTI") {
-      const mbti =
-        normalizeMbtiType(
-          testResult.resultName
-        );
+      const mbti = normalizeMbtiType(testResult.resultName);
 
       if (!mbti) {
         return {
           success: false,
-          error:
-            "Kết quả MBTI này chưa đủ rõ để dùng làm type hiển thị.",
+          error: "Kết quả MBTI này chưa đủ rõ để dùng làm type hiển thị.",
         };
       }
 
       data = {
-        confirmedMbtiType:
-          mbti,
+        confirmedMbtiType: mbti,
 
-        confirmedMbtiSource:
-          "TEST",
+        confirmedMbtiSource: "TEST",
 
-        confirmedMbtiTestResultId:
-          testResult.id,
+        confirmedMbtiTestResultId: testResult.id,
       };
     } else {
-      const core =
-        extractEnneagramCoreFromResult(
-          testResult.resultName
-        );
+      const core = extractEnneagramCoreFromResult(testResult.resultName);
 
       if (!core) {
         return {
           success: false,
-          error:
-            "Kết quả Enneagram này không hợp lệ để dùng làm identity.",
+          error: "Kết quả Enneagram này không hợp lệ để dùng làm identity.",
         };
       }
 
-      const sourceText = [
-        testResult.resultName,
-        testResult.details ?? "",
-      ].join(" ");
+      const sourceText = [testResult.resultName, testResult.details ?? ""].join(
+        " ",
+      );
 
-      const wing =
-        extractEnneagramWingFromText(
-          core,
-          sourceText
-        );
+      const wing = extractEnneagramWingFromText(core, sourceText);
 
-      const tritype =
-        extractEnneagramTritypeFromText(
-          core,
-          sourceText
-        );
+      const tritype = extractEnneagramTritypeFromText(core, sourceText);
 
       data = {
-        confirmedEnneagramType:
-          `Type ${core}`,
+        confirmedEnneagramType: `Type ${core}`,
 
-        confirmedEnneagramWing:
-          wing,
+        confirmedEnneagramWing: wing,
 
-        confirmedEnneagramTritype:
-          tritype,
+        confirmedEnneagramTritype: tritype,
 
-        confirmedEnneagramSource:
-          "TEST",
+        confirmedEnneagramSource: "TEST",
 
-        confirmedEnneagramTestResultId:
-          testResult.id,
+        confirmedEnneagramTestResultId: testResult.id,
       };
     }
 
-    const updated =
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
+    const updated = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
 
-        data,
+      data,
 
-        include: {
-          testResults: {
-            orderBy: {
-              createdAt:
-                "desc",
-            },
+      include: {
+        testResults: {
+          orderBy: {
+            createdAt: "desc",
           },
         },
-      });
+      },
+    });
 
     revalidatePersonalityPaths();
 
     return {
       success: true,
 
-      profile:
-        serializeUserProfile(
-          updated
-        ),
+      profile: serializeUserProfile(updated),
     };
   } catch (error) {
-    console.error(
-      "Lỗi xác nhận TestResult personality:",
-      error
-    );
+    console.error("Lỗi xác nhận TestResult personality:", error);
 
     return {
       success: false,
@@ -1392,13 +1089,49 @@ export async function confirmTestPersonalityType({
 /** Validate all typology systems before writing; extra systems always public. */
 export async function saveTypology(input: TypologyInput) {
   try {
-    const {userId}=await auth();
-    if(!userId)return {success:false as const,error:"Vui lòng đăng nhập lại."};
-    const extras=validateExtraTypology(input);
-    const result=await saveManualPersonalityTypes(input);
-    if(!result.success)return result;
-    await prisma.user.update({where:{clerkId:userId},data:extras});
+    const { userId } = await auth();
+    if (!userId)
+      return { success: false as const, error: "Vui lòng đăng nhập lại." };
+    const extras = validateExtraTypology(input);
+    const result = await saveManualPersonalityTypes(input);
+    if (!result.success) return result;
+    // Editing a selected type explicitly switches that identity to manual.
+    // Keeping the same values preserves an existing TEST selection.
+    const profile = result.profile!;
+    const identity: Record<string, unknown> = {};
+    if (
+      input.mbtiType !== undefined &&
+      (input.mbtiType?.trim().toUpperCase() || null) !==
+        profile.confirmedMbtiType
+    ) {
+      identity.confirmedMbtiType = profile.manualMbtiType;
+      identity.confirmedMbtiSource = profile.manualMbtiType ? "MANUAL" : null;
+      identity.confirmedMbtiTestResultId = null;
+    }
+    if (
+      input.enneagramCore !== undefined &&
+      (profile.manualEnneagramType !== profile.confirmedEnneagramType ||
+        profile.manualEnneagramWing !== profile.confirmedEnneagramWing ||
+        profile.manualEnneagramTritype !== profile.confirmedEnneagramTritype)
+    ) {
+      identity.confirmedEnneagramType = profile.manualEnneagramType;
+      identity.confirmedEnneagramWing = profile.manualEnneagramWing;
+      identity.confirmedEnneagramTritype = profile.manualEnneagramTritype;
+      identity.confirmedEnneagramSource = profile.manualEnneagramType
+        ? "MANUAL"
+        : null;
+      identity.confirmedEnneagramTestResultId = null;
+    }
+    await prisma.user.update({
+      where: { clerkId: userId },
+      data: { ...extras, ...identity },
+    });
     revalidatePersonalityPaths();
     return getUserProfile();
-  }catch{return {success:false as const,error:"Typology không hợp lệ hoặc chưa lưu được."};}
+  } catch {
+    return {
+      success: false as const,
+      error: "Typology không hợp lệ hoặc chưa lưu được.",
+    };
+  }
 }

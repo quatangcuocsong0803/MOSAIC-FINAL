@@ -1,4 +1,4 @@
-import {EXTRA_TYPOLOGY_FIELDS} from "@/lib/typology";
+import { EXTRA_TYPOLOGY_FIELDS } from "@/lib/typology";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -19,18 +19,11 @@ export default async function FriendProfilePage({
   const result = await getFriendProfile(userId);
 
   if (!result.success) {
-    if (result.reason === "UNAUTHENTICATED") {
-      redirect("/sign-in");
-    }
-
     if (result.reason === "SELF") {
       redirect("/profile");
     }
 
-    if (
-      result.reason === "NOT_FRIENDS" ||
-      result.reason === "USER_NOT_FOUND"
-    ) {
+    if (result.reason === "NOT_FRIENDS" || result.reason === "USER_NOT_FOUND") {
       notFound();
     }
 
@@ -59,11 +52,11 @@ export default async function FriendProfilePage({
   const { profile } = result;
 
   const displayName =
-    profile.displayName || profile.username ||
+    profile.displayName ||
+    profile.username ||
     `Thành viên #${profile.id.slice(-4)}`;
 
-  const avatarLetter =
-    (displayName.trim()[0] || "M").toUpperCase();
+  const avatarLetter = (displayName.trim()[0] || "M").toUpperCase();
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-10 md:py-14">
@@ -93,7 +86,8 @@ export default async function FriendProfilePage({
               </h1>
 
               <p className="mt-2 text-sm text-[#8B7355]">
-                {profile.username ? `@${profile.username} · ` : ""}MID {String(profile.mid).padStart(7,"0")}
+                {profile.username ? `@${profile.username} · ` : ""}MID{" "}
+                {String(profile.mid).padStart(7, "0")}
               </p>
             </div>
           </div>
@@ -106,21 +100,14 @@ export default async function FriendProfilePage({
             </h2>
 
             <p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#6B5A46]">
-              {profile.bio?.trim() ||
-                "Người dùng chưa thêm phần giới thiệu."}
+              {profile.bio?.trim() || "Người dùng chưa thêm phần giới thiệu."}
             </p>
 
             {profile.age !== null && <p className="mt-3">{profile.age} tuổi</p>}
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <ProfileField
-                label="Địa điểm"
-                value={profile.location}
-              />
+              <ProfileField label="Địa điểm" value={profile.location} />
 
-              <ProfileField
-                label="Cung hoàng đạo"
-                value={profile.zodiacSign}
-              />
+              <ProfileField label="Cung hoàng đạo" value={profile.zodiacSign} />
 
               <ProfileField
                 label="Sở thích"
@@ -161,7 +148,17 @@ export default async function FriendProfilePage({
                   </span>
                 )}
 
-                {EXTRA_TYPOLOGY_FIELDS.map(field=>profile[field]&&<span key={field} className="rounded-full border border-[#8B6B4A]/30 px-3 py-1.5 text-xs">{profile[field]}</span>)}
+                {EXTRA_TYPOLOGY_FIELDS.map(
+                  (field) =>
+                    profile[field] && (
+                      <span
+                        key={field}
+                        className="rounded-full border border-[#8B6B4A]/30 px-3 py-1.5 text-xs"
+                      >
+                        {profile[field]}
+                      </span>
+                    ),
+                )}
                 {!profile.confirmedMbtiType &&
                   !profile.confirmedEnneagramType && (
                     <p className="text-xs text-[#A89F91]">
@@ -172,10 +169,12 @@ export default async function FriendProfilePage({
             </div>
 
             <div className="mt-5">
-              {result.isFriend && <FriendProfileActions
-                targetUserId={profile.id}
-                displayName={displayName}
-              />}
+              {result.isFriend && (
+                <FriendProfileActions
+                  targetUserId={profile.id}
+                  displayName={displayName}
+                />
+              )}
             </div>
 
             <div className="mt-5">

@@ -1,4 +1,95 @@
-'use client';
-import {TYPOLOGY_OPTIONS,type TypologyInput} from '@/lib/typology';
-const labels:Record<keyof typeof TYPOLOGY_OPTIONS,string>={mbtiType:'MBTI',enneagramCore:'Enneagram',socionicsType:'Socionics',attitudinalPsyche:'Attitudinal Psyche',instinctStack:'Instinct stacking',moralAlignment:'Moral alignment',temperament:'Temperament',sloanType:'Big Five / SLOAN'};
-export default function TypologyFields({value,onChange}:{value:TypologyInput;onChange:(value:TypologyInput)=>void}){return <div className="space-y-4"><p className="text-sm">Typology đã điền luôn công khai. Bạn có thể chọn thủ công hoặc làm bài test để khám phá thêm.</p>{Object.entries(TYPOLOGY_OPTIONS).map(([key,options])=>{const field=key as keyof typeof TYPOLOGY_OPTIONS;return <label key={key} className="block">{labels[field]}<select className="mt-2 w-full rounded-xl border border-[#E2D4B7] bg-[#FAF8F5] p-3" value={value[field]||''} onChange={e=>onChange({...value,[field]:e.target.value||null,...(field==='enneagramCore'?{enneagramWing:null,enneagramTritype:null}:{})})}><option value="">Chưa chọn</option>{options.map(option=><option key={option}>{option}</option>)}</select></label>;})}{value.enneagramCore&&<><label className="block">Wing<select className="mt-2 w-full rounded-xl border border-[#E2D4B7] p-3" value={value.enneagramWing||''} onChange={e=>onChange({...value,enneagramWing:e.target.value||null})}><option value="">Chưa chọn</option>{[Number(value.enneagramCore)===1?9:Number(value.enneagramCore)-1,Number(value.enneagramCore)===9?1:Number(value.enneagramCore)+1].map(wing=><option key={wing}>{value.enneagramCore}w{wing}</option>)}</select></label><label className="block">Tritype (Heart → Head → Gut)<input className="mt-2 w-full rounded-xl border border-[#E2D4B7] p-3" value={value.enneagramTritype||''} maxLength={3} pattern="[234][567][891]" placeholder="Ví dụ: 458" onChange={e=>onChange({...value,enneagramTritype:e.target.value||null})}/></label></>}</div>;}
+"use client";
+import { TYPOLOGY_OPTIONS, type TypologyInput } from "@/lib/typology";
+const labels: Record<keyof typeof TYPOLOGY_OPTIONS, string> = {
+  mbtiType: "MBTI",
+  enneagramCore: "Enneagram",
+  socionicsType: "Socionics",
+  attitudinalPsyche: "Attitudinal Psyche",
+  instinctStack: "Instinct stacking",
+  moralAlignment: "Moral alignment",
+  temperament: "Temperament",
+  sloanType: "Big Five / SLOAN",
+};
+export default function TypologyFields({
+  value,
+  onChange,
+}: {
+  value: TypologyInput;
+  onChange: (value: TypologyInput) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm">
+        Typology đã điền luôn công khai. Bạn có thể chọn thủ công hoặc làm bài
+        test để khám phá thêm.
+      </p>
+      {Object.entries(TYPOLOGY_OPTIONS).map(([key, options]) => {
+        const field = key as keyof typeof TYPOLOGY_OPTIONS;
+        return (
+          <label key={key} className="block">
+            {labels[field]}
+            <select
+              className="mt-2 w-full rounded-xl border border-[#E2D4B7] bg-[#FAF8F5] p-3"
+              value={value[field] || ""}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  [field]: e.target.value || null,
+                  ...(field === "enneagramCore"
+                    ? { enneagramWing: null, enneagramTritype: null }
+                    : {}),
+                })
+              }
+            >
+              <option value="">Chưa chọn</option>
+              {options.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+        );
+      })}
+      {value.enneagramCore && (
+        <>
+          <label className="block">
+            Wing
+            <select
+              className="mt-2 w-full rounded-xl border border-[#E2D4B7] p-3"
+              value={value.enneagramWing || ""}
+              onChange={(e) =>
+                onChange({ ...value, enneagramWing: e.target.value || null })
+              }
+            >
+              <option value="">Chưa chọn</option>
+              {[
+                Number(value.enneagramCore) === 1
+                  ? 9
+                  : Number(value.enneagramCore) - 1,
+                Number(value.enneagramCore) === 9
+                  ? 1
+                  : Number(value.enneagramCore) + 1,
+              ].map((wing) => (
+                <option key={wing}>
+                  {value.enneagramCore}w{wing}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            Tritype (Heart → Head → Gut)
+            <input
+              className="mt-2 w-full rounded-xl border border-[#E2D4B7] p-3"
+              value={value.enneagramTritype || ""}
+              maxLength={3}
+              pattern="[234][567][891]"
+              placeholder="Ví dụ: 458"
+              onChange={(e) =>
+                onChange({ ...value, enneagramTritype: e.target.value || null })
+              }
+            />
+          </label>
+        </>
+      )}
+    </div>
+  );
+}

@@ -1,4 +1,5 @@
 "use server";
+import { identitySelect, identityForViewer } from "@/lib/profile-identity";
 
 import { auth } from "@clerk/nextjs/server";
 
@@ -21,28 +22,25 @@ async function getCurrentDbUser() {
   });
 }
 
-async function getAcceptedFriendIds(
-  currentUserId: string,
-) {
-  const friendships =
-    await prisma.friendship.findMany({
-      where: {
-        status: "ACCEPTED",
-        OR: [
-          {
-            senderId: currentUserId,
-          },
-          {
-            receiverId: currentUserId,
-          },
-        ],
-      },
+async function getAcceptedFriendIds(currentUserId: string) {
+  const friendships = await prisma.friendship.findMany({
+    where: {
+      status: "ACCEPTED",
+      OR: [
+        {
+          senderId: currentUserId,
+        },
+        {
+          receiverId: currentUserId,
+        },
+      ],
+    },
 
-      select: {
-        senderId: true,
-        receiverId: true,
-      },
-    });
+    select: {
+      senderId: true,
+      receiverId: true,
+    },
+  });
 
   return friendships.map((friendship) =>
     friendship.senderId === currentUserId
@@ -57,8 +55,7 @@ async function getAcceptedFriendIds(
 
 export async function getUtilityCounts() {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -70,7 +67,9 @@ export async function getUtilityCounts() {
 
     const [friendIds, unreadNotifications] = await Promise.all([
       getAcceptedFriendIds(currentUser.id),
-      prisma.notification.count({where:{recipientId:currentUser.id,isRead:false}}),
+      prisma.notification.count({
+        where: { recipientId: currentUser.id, isRead: false },
+      }),
     ]);
 
     const unreadMessages =
@@ -87,8 +86,7 @@ export async function getUtilityCounts() {
               conversation: {
                 OR: [
                   {
-                    participantAId:
-                      currentUser.id,
+                    participantAId: currentUser.id,
 
                     participantBId: {
                       in: friendIds,
@@ -96,8 +94,7 @@ export async function getUtilityCounts() {
                   },
 
                   {
-                    participantBId:
-                      currentUser.id,
+                    participantBId: currentUser.id,
 
                     participantAId: {
                       in: friendIds,
@@ -114,10 +111,7 @@ export async function getUtilityCounts() {
       unreadMessages,
     };
   } catch (error) {
-    console.error(
-      "Lỗi getUtilityCounts:",
-      error,
-    );
+    console.error("Lỗi getUtilityCounts:", error);
 
     return {
       success: false as const,
@@ -133,81 +127,79 @@ export async function getUtilityCounts() {
 
 export async function getNotifications() {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
         success: false as const,
-        reason:
-          "UNAUTHENTICATED" as const,
+        reason: "UNAUTHENTICATED" as const,
         notifications: [],
         unreadCount: 0,
       };
     }
 
-    const [notifications, unreadCount] =
-      await Promise.all([
-        prisma.notification.findMany({
-          where: {
-            recipientId:
-              currentUser.id,
-          },
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: {
+          recipientId: currentUser.id,
+        },
 
-          orderBy: {
-            createdAt: "desc",
-          },
+        orderBy: {
+          createdAt: "desc",
+        },
 
-          take: 30,
+        take: 30,
 
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            body: true,
-            href: true,
-            entityType: true,
-            entityId: true,
-            isRead: true,
-            createdAt: true,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          body: true,
+          href: true,
+          entityType: true,
+          entityId: true,
+          isRead: true,
+          createdAt: true,
 
-            actor: {
-              select: {
-                id: true,
-                username: true,
-                avatarUrl: true,
-              },
+          actor: {
+            select: {
+              ...identitySelect,
             },
           },
-        }),
+        },
+      }),
 
-        prisma.notification.count({
-          where: {
-            recipientId:
-              currentUser.id,
-            isRead: false,
-          },
-        }),
-      ]);
+      prisma.notification.count({
+        where: {
+          recipientId: currentUser.id,
+          isRead: false,
+        },
+      }),
+    ]);
 
+    const identity = await identityForViewer(currentUser.id);
     return {
       success: true as const,
       unreadCount,
 
-      notifications:
-        notifications.map(
-          (notification) => ({
-            ...notification,
-            createdAt:
-              notification.createdAt.toISOString(),
-          }),
-        ),
+      notifications: notifications.map((notification) => ({
+        ...notification,
+        title:
+          notification.actor &&
+          notification.actor.usernameVisibility !== "PUBLIC"
+            ? "Thông báo từ một thành viên MOSAIC"
+            : notification.title,
+        actor: notification.actor ? identity(notification.actor) : null,
+        body:
+          notification.actor &&
+          notification.actor.usernameVisibility !== "PUBLIC"
+            ? null
+            : notification.body,
+        createdAt: notification.createdAt.toISOString(),
+      })),
     };
   } catch (error) {
-    console.error(
-      "Lỗi getNotifications:",
-      error,
-    );
+    console.error("Lỗi getNotifications:", error);
 
     return {
       success: false as const,
@@ -222,12 +214,9 @@ export async function getNotifications() {
 // MARK ONE READ
 // ============================================================
 
-export async function markNotificationRead(
-  notificationId: string,
-) {
+export async function markNotificationRead(notificationId: string) {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -238,8 +227,7 @@ export async function markNotificationRead(
     await prisma.notification.updateMany({
       where: {
         id: notificationId,
-        recipientId:
-          currentUser.id,
+        recipientId: currentUser.id,
         isRead: false,
       },
 
@@ -253,10 +241,7 @@ export async function markNotificationRead(
       success: true as const,
     };
   } catch (error) {
-    console.error(
-      "Lỗi markNotificationRead:",
-      error,
-    );
+    console.error("Lỗi markNotificationRead:", error);
 
     return {
       success: false as const,
@@ -270,8 +255,7 @@ export async function markNotificationRead(
 
 export async function markAllNotificationsRead() {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -281,8 +265,7 @@ export async function markAllNotificationsRead() {
 
     await prisma.notification.updateMany({
       where: {
-        recipientId:
-          currentUser.id,
+        recipientId: currentUser.id,
         isRead: false,
       },
 
@@ -296,10 +279,7 @@ export async function markAllNotificationsRead() {
       success: true as const,
     };
   } catch (error) {
-    console.error(
-      "Lỗi markAllNotificationsRead:",
-      error,
-    );
+    console.error("Lỗi markAllNotificationsRead:", error);
 
     return {
       success: false as const,
@@ -311,12 +291,9 @@ export async function markAllNotificationsRead() {
 // DELETE ONE
 // ============================================================
 
-export async function deleteNotification(
-  notificationId: string,
-) {
+export async function deleteNotification(notificationId: string) {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -327,8 +304,7 @@ export async function deleteNotification(
     await prisma.notification.deleteMany({
       where: {
         id: notificationId,
-        recipientId:
-          currentUser.id,
+        recipientId: currentUser.id,
       },
     });
 
@@ -336,10 +312,7 @@ export async function deleteNotification(
       success: true as const,
     };
   } catch (error) {
-    console.error(
-      "Lỗi deleteNotification:",
-      error,
-    );
+    console.error("Lỗi deleteNotification:", error);
 
     return {
       success: false as const,

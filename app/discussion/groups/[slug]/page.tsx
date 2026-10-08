@@ -1,3 +1,4 @@
+import {identitySelect,identityForViewer} from "@/lib/profile-identity";
 import { publicCommentWhere } from "@/lib/discussion/comment-service";
 import {
   auth,
@@ -82,6 +83,7 @@ export default async function DiscussionGroupPage({
 
         creator: {
           select: {
+ ...identitySelect,
             username:
               true,
 
@@ -95,6 +97,9 @@ export default async function DiscussionGroupPage({
   if (!group) {
     notFound();
   }
+
+  const identity = await identityForViewer(currentUser?.id);
+  Object.assign(group.creator,identity(group.creator));
 
   const membership =
     currentUser
@@ -166,6 +171,7 @@ export default async function DiscussionGroupPage({
 
         user: {
           select: {
+ ...identitySelect,
             id: true,
 
             username:
@@ -224,6 +230,7 @@ export default async function DiscussionGroupPage({
 
             user: {
               select: {
+ ...identitySelect,
                 username:
                   true,
 
@@ -260,6 +267,7 @@ export default async function DiscussionGroupPage({
 
             user: {
               select: {
+ ...identitySelect,
                 username:
                   true,
 
@@ -349,6 +357,8 @@ export default async function DiscussionGroupPage({
         },
       },
     });
+
+  for(const item of [...members,...pendingRequests,...bannedMembers]) Object.assign(item.user,identity(item.user));
 
   return (
     <main className="min-h-screen bg-[#F7F5F1]">

@@ -101,6 +101,8 @@ model User {
   // Discussion groups
   discussionGroupsCreated DiscussionGroup[]       @relation("DiscussionGroupCreator")
   discussionGroupMembers  DiscussionGroupMember[]
+
+  @@index([interestCodes], type: Gin)
 }
 
 // ============================================================

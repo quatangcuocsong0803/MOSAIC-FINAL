@@ -1,25 +1,18 @@
 "use server";
+import { ensureUser } from "@/lib/ensure-user";
 
-import {
-  auth,
-} from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 
-import {
-  revalidatePath,
-} from "next/cache";
+import { revalidatePath } from "next/cache";
 
-import {
-  prisma,
-} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // ============================================================
 // CURRENT DB USER
 // ============================================================
 
 async function getCurrentDbUser() {
-  const {
-    userId,
-  } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return null;
@@ -27,88 +20,39 @@ async function getCurrentDbUser() {
 
   // Một Clerk user mới vẫn có thể dùng Groups
   // ngay cả khi User row chưa được tạo ở flow khác.
-  return prisma.user.upsert({
-    where: {
-      clerkId:
-        userId,
-    },
-
-    update: {},
-
-    create: {
-      clerkId:
-        userId,
-    },
-
-    select: {
-      id: true,
-    },
-  });
+  return ensureUser(userId);
 }
 
 // ============================================================
 // SLUG
 // ============================================================
 
-function makeSlug(
-  value: string,
-) {
+function makeSlug(value: string) {
   return value
-    .normalize(
-      "NFKD",
-    )
-    .replace(
-      /[\u0300-\u036f]/g,
-      "",
-    )
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(
-      /đ/g,
-      "d",
-    )
-    .replace(
-      /[^a-z0-9]+/g,
-      "-",
-    )
-    .replace(
-      /^-+|-+$/g,
-      "",
-    )
-    .slice(
-      0,
-      60,
-    );
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
 }
 
-async function uniqueSlug(
-  name: string,
-) {
-  const base =
-    makeSlug(
-      name,
-    ) ||
-    "group";
+async function uniqueSlug(name: string) {
+  const base = makeSlug(name) || "group";
 
-  for (
-    let attempt = 0;
-    attempt < 20;
-    attempt += 1
-  ) {
-    const slug =
-      attempt === 0
-        ? base
-        : `${base}-${attempt + 1}`;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
 
-    const exists =
-      await prisma.discussionGroup.findUnique({
-        where: {
-          slug,
-        },
+    const exists = await prisma.discussionGroup.findUnique({
+      where: {
+        slug,
+      },
 
-        select: {
-          id: true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
     if (!exists) {
       return slug;
@@ -122,179 +66,114 @@ async function uniqueSlug(
 // CREATE
 // ============================================================
 
-export async function createDiscussionGroup(
-  input: {
-    name: string;
-    description: string;
+export async function createDiscussionGroup(input: {
+  name: string;
+  description: string;
 
-    rules?: string;
+  rules?: string;
 
-    visibility:
-      | "PUBLIC"
-      | "PRIVATE";
+  visibility: "PUBLIC" | "PRIVATE";
 
-    joinPolicy:
-      | "OPEN"
-      | "APPROVAL"
-      | "INVITE_ONLY";
-  },
-) {
+  joinPolicy: "OPEN" | "APPROVAL" | "INVITE_ONLY";
+}) {
   try {
-    const user =
-      await getCurrentDbUser();
+    const user = await getCurrentDbUser();
 
     if (!user) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn cần đăng nhập.",
+        error: "Bạn cần đăng nhập.",
       };
     }
 
-    const name =
-      input.name
-        ?.trim();
+    const name = input.name?.trim();
 
-    const description =
-      input.description
-        ?.trim();
+    const description = input.description?.trim();
 
-    const rules =
-      input.rules
-        ?.trim() ||
-      null;
+    const rules = input.rules?.trim() || null;
 
-    if (
-      !name ||
-      name.length < 3 ||
-      name.length > 70
-    ) {
+    if (!name || name.length < 3 || name.length > 70) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Tên nhóm cần từ 3–70 ký tự.",
+        error: "Tên nhóm cần từ 3–70 ký tự.",
       };
     }
 
-    if (
-      !description ||
-      description.length < 30 ||
-      description.length > 700
-    ) {
+    if (!description || description.length < 30 || description.length > 700) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Mô tả nhóm cần từ 30–700 ký tự.",
+        error: "Mô tả nhóm cần từ 30–700 ký tự.",
       };
     }
 
-    if (
-      rules &&
-      rules.length > 3000
-    ) {
+    if (rules && rules.length > 3000) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Nội quy nhóm tối đa 3.000 ký tự.",
+        error: "Nội quy nhóm tối đa 3.000 ký tự.",
       };
     }
 
-    const visibility =
-      input.visibility ===
-      "PRIVATE"
-        ? "PRIVATE"
-        : "PUBLIC";
+    const visibility = input.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
 
     const joinPolicy =
-      input.joinPolicy ===
-        "APPROVAL" ||
-      input.joinPolicy ===
-        "INVITE_ONLY"
+      input.joinPolicy === "APPROVAL" || input.joinPolicy === "INVITE_ONLY"
         ? input.joinPolicy
         : "OPEN";
 
-    const slug =
-      await uniqueSlug(
-        name,
-      );
+    const slug = await uniqueSlug(name);
 
-    const group =
-      await prisma.$transaction(
-        async (tx) => {
-          const created =
-            await tx.discussionGroup.create({
-              data: {
-                slug,
-                name,
-                description,
-                rules,
+    const group = await prisma.$transaction(async (tx) => {
+      const created = await tx.discussionGroup.create({
+        data: {
+          slug,
+          name,
+          description,
+          rules,
 
-                visibility,
-                joinPolicy,
+          visibility,
+          joinPolicy,
 
-                creatorId:
-                  user.id,
-              },
-            });
-
-          await tx.discussionGroupMember.create({
-            data: {
-              groupId:
-                created.id,
-
-              userId:
-                user.id,
-
-              role:
-                "OWNER",
-
-              status:
-                "ACTIVE",
-            },
-          });
-
-          return created;
+          creatorId: user.id,
         },
-      );
+      });
 
-    revalidatePath(
-      "/discussion",
-    );
+      await tx.discussionGroupMember.create({
+        data: {
+          groupId: created.id,
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+          userId: user.id,
+
+          role: "OWNER",
+
+          status: "ACTIVE",
+        },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/discussion");
+
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
 
-      groupId:
-        group.id,
+      groupId: group.id,
 
-      slug:
-        group.slug,
+      slug: group.slug,
     };
   } catch (error) {
-    console.error(
-      "createDiscussionGroup error:",
-      error,
-    );
+    console.error("createDiscussionGroup error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể tạo nhóm.",
+      error: "Không thể tạo nhóm.",
     };
   }
 }
@@ -303,170 +182,119 @@ export async function createDiscussionGroup(
 // JOIN / REQUEST JOIN
 // ============================================================
 
-export async function joinDiscussionGroup(
-  groupId: string,
-) {
+export async function joinDiscussionGroup(groupId: string) {
   try {
-    const user =
-      await getCurrentDbUser();
+    const user = await getCurrentDbUser();
 
     if (!user) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn cần đăng nhập.",
+        error: "Bạn cần đăng nhập.",
       };
     }
 
-    const group =
-      await prisma.discussionGroup.findFirst({
-        where: {
-          id:
-            groupId,
+    const group = await prisma.discussionGroup.findFirst({
+      where: {
+        id: groupId,
 
-          isActive:
-            true,
-        },
+        isActive: true,
+      },
 
-        select: {
-          id: true,
-          slug: true,
+      select: {
+        id: true,
+        slug: true,
 
-          joinPolicy:
-            true,
-        },
-      });
+        joinPolicy: true,
+      },
+    });
 
     if (!group) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Nhóm không tồn tại.",
+        error: "Nhóm không tồn tại.",
       };
     }
 
-    const existing =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          groupId_userId: {
-            groupId:
-              group.id,
+    const existing = await prisma.discussionGroupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId: group.id,
 
-            userId:
-              user.id,
-          },
+          userId: user.id,
         },
+      },
 
-        select: {
-          id: true,
-          role: true,
-          status: true,
-        },
-      });
+      select: {
+        id: true,
+        role: true,
+        status: true,
+      },
+    });
 
-    if (
-      existing?.status ===
-      "BANNED"
-    ) {
+    if (existing?.status === "BANNED") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không thể tham gia nhóm này.",
+        error: "Bạn không thể tham gia nhóm này.",
       };
     }
 
-    if (
-      existing?.status ===
-      "ACTIVE"
-    ) {
+    if (existing?.status === "ACTIVE") {
       return {
-        success:
-          true as const,
+        success: true as const,
 
-        status:
-          "ACTIVE" as const,
+        status: "ACTIVE" as const,
       };
     }
 
-    if (
-      existing?.status ===
-      "PENDING"
-    ) {
+    if (existing?.status === "PENDING") {
       return {
-        success:
-          true as const,
+        success: true as const,
 
-        status:
-          "PENDING" as const,
+        status: "PENDING" as const,
       };
     }
 
-    if (
-      group.joinPolicy ===
-      "INVITE_ONLY"
-    ) {
+    if (group.joinPolicy === "INVITE_ONLY") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Nhóm này chỉ tham gia bằng lời mời.",
+        error: "Nhóm này chỉ tham gia bằng lời mời.",
       };
     }
 
-    const status =
-      group.joinPolicy ===
-      "APPROVAL"
-        ? "PENDING"
-        : "ACTIVE";
+    const status = group.joinPolicy === "APPROVAL" ? "PENDING" : "ACTIVE";
 
     await prisma.discussionGroupMember.create({
       data: {
-        groupId:
-          group.id,
+        groupId: group.id,
 
-        userId:
-          user.id,
+        userId: user.id,
 
-        role:
-          "MEMBER",
+        role: "MEMBER",
 
         status,
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
 
       status,
     };
   } catch (error) {
-    console.error(
-      "joinDiscussionGroup error:",
-      error,
-    );
+    console.error("joinDiscussionGroup error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể tham gia nhóm.",
+      error: "Không thể tham gia nhóm.",
     };
   }
 }
@@ -475,97 +303,72 @@ export async function joinDiscussionGroup(
 // LEAVE / CANCEL PENDING REQUEST
 // ============================================================
 
-export async function leaveDiscussionGroup(
-  groupId: string,
-) {
+export async function leaveDiscussionGroup(groupId: string) {
   try {
-    const user =
-      await getCurrentDbUser();
+    const user = await getCurrentDbUser();
 
     if (!user) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn cần đăng nhập.",
+        error: "Bạn cần đăng nhập.",
       };
     }
 
-    const membership =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          groupId_userId: {
-            groupId,
+    const membership = await prisma.discussionGroupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId,
 
-            userId:
-              user.id,
+          userId: user.id,
+        },
+      },
+
+      include: {
+        group: {
+          select: {
+            slug: true,
           },
         },
-
-        include: {
-          group: {
-            select: {
-              slug: true,
-            },
-          },
-        },
-      });
+      },
+    });
 
     if (!membership) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn chưa tham gia nhóm.",
+        error: "Bạn chưa tham gia nhóm.",
       };
     }
 
-    if (
-      membership.role ===
-      "OWNER"
-    ) {
+    if (membership.role === "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Chủ nhóm không thể rời nhóm trước khi chuyển quyền sở hữu.",
+        error: "Chủ nhóm không thể rời nhóm trước khi chuyển quyền sở hữu.",
       };
     }
 
     await prisma.discussionGroupMember.delete({
       where: {
-        id:
-          membership.id,
+        id: membership.id,
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${membership.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${membership.group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "leaveDiscussionGroup error:",
-      error,
-    );
+    console.error("leaveDiscussionGroup error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể rời nhóm.",
+      error: "Không thể rời nhóm.",
     };
   }
 }
@@ -579,136 +382,100 @@ export async function respondDiscussionGroupRequest(
   approve: boolean,
 ) {
   try {
-    const user =
-      await getCurrentDbUser();
+    const user = await getCurrentDbUser();
 
     if (!user) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn cần đăng nhập.",
+        error: "Bạn cần đăng nhập.",
       };
     }
 
-    const request =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const request = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
-    if (
-      !request ||
-      request.status !==
-      "PENDING"
-    ) {
+    if (!request || request.status !== "PENDING") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Yêu cầu tham gia không còn tồn tại.",
+        error: "Yêu cầu tham gia không còn tồn tại.",
       };
     }
 
-    const manager =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          groupId_userId: {
-            groupId:
-              request.groupId,
+    const manager = await prisma.discussionGroupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId: request.groupId,
 
-            userId:
-              user.id,
-          },
+          userId: user.id,
         },
+      },
 
-        select: {
-          role: true,
-          status: true,
-        },
-      });
+      select: {
+        role: true,
+        status: true,
+      },
+    });
 
     const allowed =
-      manager?.status ===
-        "ACTIVE" &&
-      (
-        manager.role ===
-          "OWNER" ||
-        manager.role ===
-          "MODERATOR"
-      );
+      manager?.status === "ACTIVE" &&
+      (manager.role === "OWNER" || manager.role === "MODERATOR");
 
     if (!allowed) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền duyệt thành viên.",
+        error: "Bạn không có quyền duyệt thành viên.",
       };
     }
 
     if (approve) {
       await prisma.discussionGroupMember.update({
         where: {
-          id:
-            request.id,
+          id: request.id,
         },
 
         data: {
-          status:
-            "ACTIVE",
+          status: "ACTIVE",
 
-          role:
-            "MEMBER",
+          role: "MEMBER",
         },
       });
     } else {
       await prisma.discussionGroupMember.delete({
         where: {
-          id:
-            request.id,
+          id: request.id,
         },
       });
     }
 
-    revalidatePath(
-      `/discussion/groups/${request.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${request.group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "respondDiscussionGroupRequest error:",
-      error,
-    );
+    console.error("respondDiscussionGroupRequest error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể xử lý yêu cầu tham gia.",
+      error: "Không thể xử lý yêu cầu tham gia.",
     };
   }
 }
@@ -720,105 +487,76 @@ export async function respondDiscussionGroupRequest(
 
 export async function setDiscussionGroupMemberRole(
   membershipId: string,
-  role:
-    | "MEMBER"
-    | "MODERATOR",
+  role: "MEMBER" | "MODERATOR",
 ) {
   try {
-    const user =
-      await getCurrentDbUser();
+    const user = await getCurrentDbUser();
 
     if (!user) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn cần đăng nhập.",
+        error: "Bạn cần đăng nhập.",
       };
     }
 
-    const target =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const target = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
-    if (
-      !target ||
-      target.status !==
-      "ACTIVE"
-    ) {
+    if (!target || target.status !== "ACTIVE") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Thành viên không hợp lệ.",
+        error: "Thành viên không hợp lệ.",
       };
     }
 
-    if (
-      target.role ===
-      "OWNER"
-    ) {
+    if (target.role === "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể thay đổi role của chủ nhóm bằng thao tác này.",
+        error: "Không thể thay đổi role của chủ nhóm bằng thao tác này.",
       };
     }
 
-    const owner =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          groupId_userId: {
-            groupId:
-              target.groupId,
+    const owner = await prisma.discussionGroupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId: target.groupId,
 
-            userId:
-              user.id,
-          },
+          userId: user.id,
         },
+      },
 
-        select: {
-          role: true,
-          status: true,
-        },
-      });
+      select: {
+        role: true,
+        status: true,
+      },
+    });
 
-    if (
-      owner?.status !==
-        "ACTIVE" ||
-      owner.role !==
-        "OWNER"
-    ) {
+    if (owner?.status !== "ACTIVE" || owner.role !== "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Chỉ chủ nhóm mới có thể thay đổi moderator.",
+        error: "Chỉ chủ nhóm mới có thể thay đổi moderator.",
       };
     }
 
     await prisma.discussionGroupMember.update({
       where: {
-        id:
-          target.id,
+        id: target.id,
       },
 
       data: {
@@ -826,26 +564,18 @@ export async function setDiscussionGroupMemberRole(
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${target.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${target.group.slug}`);
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "setDiscussionGroupMemberRole error:",
-      error,
-    );
+    console.error("setDiscussionGroupMemberRole error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể cập nhật role thành viên.",
+      error: "Không thể cập nhật role thành viên.",
     };
   }
 }
@@ -855,38 +585,29 @@ export async function setDiscussionGroupMemberRole(
 // Remove / Ban / Unban / Transfer Ownership
 // ============================================================
 
-async function getGroupGovernanceContext(
-  groupId: string,
-) {
-  const user =
-    await getCurrentDbUser();
+async function getGroupGovernanceContext(groupId: string) {
+  const user = await getCurrentDbUser();
 
   if (!user) {
     return null;
   }
 
-  const membership =
-    await prisma.discussionGroupMember.findUnique({
-      where: {
-        groupId_userId: {
-          groupId,
-          userId:
-            user.id,
-        },
+  const membership = await prisma.discussionGroupMember.findUnique({
+    where: {
+      groupId_userId: {
+        groupId,
+        userId: user.id,
       },
+    },
 
-      select: {
-        id: true,
-        role: true,
-        status: true,
-      },
-    });
+    select: {
+      id: true,
+      role: true,
+      status: true,
+    },
+  });
 
-  if (
-    !membership ||
-    membership.status !==
-      "ACTIVE"
-  ) {
+  if (!membership || membership.status !== "ACTIVE") {
     return null;
   }
 
@@ -909,142 +630,95 @@ async function getGroupGovernanceContext(
 // Owner cannot remove self.
 // ============================================================
 
-export async function removeDiscussionGroupMember(
-  membershipId: string,
-) {
+export async function removeDiscussionGroupMember(membershipId: string) {
   try {
-    const target =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const target = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
     if (!target) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Thành viên không tồn tại.",
+        error: "Thành viên không tồn tại.",
       };
     }
 
-    const context =
-      await getGroupGovernanceContext(
-        target.groupId,
-      );
+    const context = await getGroupGovernanceContext(target.groupId);
 
     if (!context) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền quản lý Group này.",
+        error: "Bạn không có quyền quản lý Group này.",
       };
     }
 
-    if (
-      target.userId ===
-      context.user.id
-    ) {
+    if (target.userId === context.user.id) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể tự remove chính mình.",
+        error: "Không thể tự remove chính mình.",
       };
     }
 
-    if (
-      target.role ===
-      "OWNER"
-    ) {
+    if (target.role === "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể remove Owner.",
+        error: "Không thể remove Owner.",
       };
     }
 
-    const actorRole =
-      context.membership.role;
+    const actorRole = context.membership.role;
 
-    if (
-      actorRole !==
-        "OWNER" &&
-      actorRole !==
-        "MODERATOR"
-    ) {
+    if (actorRole !== "OWNER" && actorRole !== "MODERATOR") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền remove thành viên.",
+        error: "Bạn không có quyền remove thành viên.",
       };
     }
 
-    if (
-      actorRole ===
-        "MODERATOR" &&
-      target.role !==
-        "MEMBER"
-    ) {
+    if (actorRole === "MODERATOR" && target.role !== "MEMBER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Moderator chỉ có thể remove Member.",
+        error: "Moderator chỉ có thể remove Member.",
       };
     }
 
     await prisma.discussionGroupMember.delete({
       where: {
-        id:
-          target.id,
+        id: target.id,
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${target.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${target.group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "removeDiscussionGroupMember error:",
-      error,
-    );
+    console.error("removeDiscussionGroupMember error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể remove thành viên.",
+      error: "Không thể remove thành viên.",
     };
   }
 }
@@ -1056,150 +730,101 @@ export async function removeDiscussionGroupMember(
 // để joinDiscussionGroup() tiếp tục fail closed.
 // ============================================================
 
-export async function banDiscussionGroupMember(
-  membershipId: string,
-) {
+export async function banDiscussionGroupMember(membershipId: string) {
   try {
-    const target =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const target = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
     if (!target) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Thành viên không tồn tại.",
+        error: "Thành viên không tồn tại.",
       };
     }
 
-    const context =
-      await getGroupGovernanceContext(
-        target.groupId,
-      );
+    const context = await getGroupGovernanceContext(target.groupId);
 
     if (!context) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền quản lý Group này.",
+        error: "Bạn không có quyền quản lý Group này.",
       };
     }
 
-    if (
-      target.userId ===
-      context.user.id
-    ) {
+    if (target.userId === context.user.id) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể tự ban chính mình.",
+        error: "Không thể tự ban chính mình.",
       };
     }
 
-    if (
-      target.role ===
-      "OWNER"
-    ) {
+    if (target.role === "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể ban Owner.",
+        error: "Không thể ban Owner.",
       };
     }
 
-    const actorRole =
-      context.membership.role;
+    const actorRole = context.membership.role;
 
-    if (
-      actorRole !==
-        "OWNER" &&
-      actorRole !==
-        "MODERATOR"
-    ) {
+    if (actorRole !== "OWNER" && actorRole !== "MODERATOR") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền ban thành viên.",
+        error: "Bạn không có quyền ban thành viên.",
       };
     }
 
-    if (
-      actorRole ===
-        "MODERATOR" &&
-      target.role !==
-        "MEMBER"
-    ) {
+    if (actorRole === "MODERATOR" && target.role !== "MEMBER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Moderator chỉ có thể ban Member.",
+        error: "Moderator chỉ có thể ban Member.",
       };
     }
 
     await prisma.discussionGroupMember.update({
       where: {
-        id:
-          target.id,
+        id: target.id,
       },
 
       data: {
-        role:
-          "MEMBER",
+        role: "MEMBER",
 
-        status:
-          "BANNED",
+        status: "BANNED",
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${target.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${target.group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "banDiscussionGroupMember error:",
-      error,
-    );
+    console.error("banDiscussionGroupMember error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể ban thành viên.",
+      error: "Không thể ban thành viên.",
     };
   }
 }
@@ -1212,102 +837,72 @@ export async function banDiscussionGroupMember(
 // sau đó có thể join/request lại theo joinPolicy.
 // ============================================================
 
-export async function unbanDiscussionGroupMember(
-  membershipId: string,
-) {
+export async function unbanDiscussionGroupMember(membershipId: string) {
   try {
-    const target =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const target = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
-    if (
-      !target ||
-      target.status !==
-        "BANNED"
-    ) {
+    if (!target || target.status !== "BANNED") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Ban record không tồn tại.",
+        error: "Ban record không tồn tại.",
       };
     }
 
-    const context =
-      await getGroupGovernanceContext(
-        target.groupId,
-      );
+    const context = await getGroupGovernanceContext(target.groupId);
 
     if (!context) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền quản lý Group này.",
+        error: "Bạn không có quyền quản lý Group này.",
       };
     }
 
     if (
-      context.membership.role !==
-        "OWNER" &&
-      context.membership.role !==
-        "MODERATOR"
+      context.membership.role !== "OWNER" &&
+      context.membership.role !== "MODERATOR"
     ) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Bạn không có quyền unban.",
+        error: "Bạn không có quyền unban.",
       };
     }
 
     await prisma.discussionGroupMember.delete({
       where: {
-        id:
-          target.id,
+        id: target.id,
       },
     });
 
-    revalidatePath(
-      `/discussion/groups/${target.group.slug}`,
-    );
+    revalidatePath(`/discussion/groups/${target.group.slug}`);
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "unbanDiscussionGroupMember error:",
-      error,
-    );
+    console.error("unbanDiscussionGroupMember error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể unban thành viên.",
+      error: "Không thể unban thành viên.",
     };
   }
 }
@@ -1320,204 +915,144 @@ export async function unbanDiscussionGroupMember(
 // Old owner becomes MODERATOR.
 // ============================================================
 
-export async function transferDiscussionGroupOwnership(
-  membershipId: string,
-) {
+export async function transferDiscussionGroupOwnership(membershipId: string) {
   try {
-    const target =
-      await prisma.discussionGroupMember.findUnique({
-        where: {
-          id:
-            membershipId,
-        },
+    const target = await prisma.discussionGroupMember.findUnique({
+      where: {
+        id: membershipId,
+      },
 
-        include: {
-          group: {
-            select: {
-              id: true,
-              slug: true,
-            },
+      include: {
+        group: {
+          select: {
+            id: true,
+            slug: true,
           },
         },
-      });
+      },
+    });
 
-    if (
-      !target ||
-      target.status !==
-        "ACTIVE"
-    ) {
+    if (!target || target.status !== "ACTIVE") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Người nhận quyền sở hữu phải là thành viên đang hoạt động.",
+        error: "Người nhận quyền sở hữu phải là thành viên đang hoạt động.",
       };
     }
 
-    if (
-      target.role ===
-      "OWNER"
-    ) {
+    if (target.role === "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Người này đã là Owner.",
+        error: "Người này đã là Owner.",
       };
     }
 
-    const context =
-      await getGroupGovernanceContext(
-        target.groupId,
-      );
+    const context = await getGroupGovernanceContext(target.groupId);
 
-    if (
-      !context ||
-      context.membership.role !==
-        "OWNER"
-    ) {
+    if (!context || context.membership.role !== "OWNER") {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Chỉ Owner mới có thể chuyển quyền sở hữu.",
+        error: "Chỉ Owner mới có thể chuyển quyền sở hữu.",
       };
     }
 
-    if (
-      target.userId ===
-      context.user.id
-    ) {
+    if (target.userId === context.user.id) {
       return {
-        success:
-          false as const,
+        success: false as const,
 
-        error:
-          "Không thể chuyển quyền cho chính mình.",
+        error: "Không thể chuyển quyền cho chính mình.",
       };
     }
 
-    await prisma.$transaction(
-      async (
-        tx,
-      ) => {
-        // Serialize governance changes per group.
-        await tx.$queryRaw`
+    await prisma.$transaction(async (tx) => {
+      // Serialize governance changes per group.
+      await tx.$queryRaw`
           SELECT pg_advisory_xact_lock(
             hashtext(${`group-owner:${target.groupId}`})
           )
         `;
 
-        const currentOwner =
-          await tx.discussionGroupMember.findUnique({
-            where: {
-              groupId_userId: {
-                groupId:
-                  target.groupId,
+      const currentOwner = await tx.discussionGroupMember.findUnique({
+        where: {
+          groupId_userId: {
+            groupId: target.groupId,
 
-                userId:
-                  context.user.id,
-              },
-            },
-
-            select: {
-              id: true,
-              role: true,
-              status: true,
-            },
-          });
-
-        const freshTarget =
-          await tx.discussionGroupMember.findUnique({
-            where: {
-              id:
-                target.id,
-            },
-
-            select: {
-              id: true,
-              role: true,
-              status: true,
-            },
-          });
-
-        if (
-          !currentOwner ||
-          currentOwner.role !==
-            "OWNER" ||
-          currentOwner.status !==
-            "ACTIVE"
-        ) {
-          throw new Error(
-            "OWNER_CHANGED",
-          );
-        }
-
-        if (
-          !freshTarget ||
-          freshTarget.status !==
-            "ACTIVE" ||
-          freshTarget.role ===
-            "OWNER"
-        ) {
-          throw new Error(
-            "TARGET_CHANGED",
-          );
-        }
-
-        await tx.discussionGroupMember.update({
-          where: {
-            id:
-              currentOwner.id,
+            userId: context.user.id,
           },
+        },
 
-          data: {
-            role:
-              "MODERATOR",
-          },
-        });
+        select: {
+          id: true,
+          role: true,
+          status: true,
+        },
+      });
 
-        await tx.discussionGroupMember.update({
-          where: {
-            id:
-              freshTarget.id,
-          },
+      const freshTarget = await tx.discussionGroupMember.findUnique({
+        where: {
+          id: target.id,
+        },
 
-          data: {
-            role:
-              "OWNER",
-          },
-        });
-      },
-    );
+        select: {
+          id: true,
+          role: true,
+          status: true,
+        },
+      });
 
-    revalidatePath(
-      `/discussion/groups/${target.group.slug}`,
-    );
+      if (
+        !currentOwner ||
+        currentOwner.role !== "OWNER" ||
+        currentOwner.status !== "ACTIVE"
+      ) {
+        throw new Error("OWNER_CHANGED");
+      }
 
-    revalidatePath(
-      "/discussion/groups",
-    );
+      if (
+        !freshTarget ||
+        freshTarget.status !== "ACTIVE" ||
+        freshTarget.role === "OWNER"
+      ) {
+        throw new Error("TARGET_CHANGED");
+      }
+
+      await tx.discussionGroupMember.update({
+        where: {
+          id: currentOwner.id,
+        },
+
+        data: {
+          role: "MODERATOR",
+        },
+      });
+
+      await tx.discussionGroupMember.update({
+        where: {
+          id: freshTarget.id,
+        },
+
+        data: {
+          role: "OWNER",
+        },
+      });
+    });
+
+    revalidatePath(`/discussion/groups/${target.group.slug}`);
+
+    revalidatePath("/discussion/groups");
 
     return {
-      success:
-        true as const,
+      success: true as const,
     };
   } catch (error) {
-    console.error(
-      "transferDiscussionGroupOwnership error:",
-      error,
-    );
+    console.error("transferDiscussionGroupOwnership error:", error);
 
     return {
-      success:
-        false as const,
+      success: false as const,
 
-      error:
-        "Không thể chuyển quyền sở hữu. Hãy tải lại trang và thử lại.",
+      error: "Không thể chuyển quyền sở hữu. Hãy tải lại trang và thử lại.",
     };
   }
 }

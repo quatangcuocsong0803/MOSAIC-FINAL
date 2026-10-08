@@ -729,7 +729,7 @@ export default function ProfilePage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={profileDetails?.avatarUrl || clerkUser?.imageUrl}
-                alt={user.name}
+                alt={profileDetails?.displayName || user.name}
                 className="w-full h-full rounded-full object-cover"
               />
             ) : (
@@ -802,7 +802,7 @@ export default function ProfilePage() {
 
         {/* Tên người dùng */}
         <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#5C4326] mt-4">
-          {user.name}
+          {profileDetails?.displayName || user.name}
         </h1>
       </div>
 
@@ -1410,7 +1410,7 @@ export default function ProfilePage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={clerkUser.imageUrl}
-                  alt={user.name}
+                  alt={profileDetails?.displayName || user.name}
                   className="w-10 h-10 rounded-full object-cover shrink-0"
                 />
               ) : (
