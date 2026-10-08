@@ -1,5 +1,7 @@
 "use server";
 
+import { visibleProfile } from "@/lib/profile-policy";
+import { ensureUser } from "@/lib/ensure-user";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { discoverWhere, discoverSelect, DISCOVER_PAGE_SIZE, type DiscoverOptions } from "@/lib/discover/query";
@@ -20,6 +22,10 @@ export interface DiscoverUserItem {
   id: string;
   clerkId: string;
   username: string | null;
+  displayName?: string | null;
+  interestCodes?: string[];
+  age?: number | null;
+  zodiacSign?: string | null;
   createdAt: Date;
   avatarUrl?: string | null;
   bio?: string | null;
@@ -98,9 +104,7 @@ export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<G
     let me=await prisma.user.findUnique({where:{clerkId:userId},select:{id:true,confirmedMbtiType:true,confirmedEnneagramType:true}});
     if(!me) {
       const clerkUser=await currentUser();
-      const name=clerkUser?.username || [clerkUser?.firstName,clerkUser?.lastName].filter(Boolean).join(' ') || `user_${userId.slice(-6)}`;
-      const exists=await prisma.user.findUnique({where:{username:name},select:{id:true}});
-      me=await prisma.user.upsert({where:{clerkId:userId},update:{},create:{clerkId:userId,username:exists?`${name}_${userId.slice(-6)}`:name},select:{id:true,confirmedMbtiType:true,confirmedEnneagramType:true}});
+      me=await ensureUser(userId,clerkUser?.fullName);
     }
     currentId=me.id;
     const myMbti=normalizeMbti(me.confirmedMbtiType);
@@ -119,7 +123,8 @@ export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<G
       else if(friend.status==='PENDING' && old!=='FRIENDS' && old!=='PENDING_SENT') statuses.set(other,friend.senderId===me.id?'PENDING_SENT':'PENDING_RECEIVED');
     }
     const page=rows.slice(0,DISCOVER_PAGE_SIZE);
-    const users:DiscoverUserItem[]=page.map(user=>{
+    const users:DiscoverUserItem[]=page.map(row=>{
+      const user=visibleProfile(row,false,statuses.get(row.id)==='FRIENDS');
       const mbti=normalizeMbti(user.confirmedMbtiType);
       const core=normalizeEnneagramCore(user.confirmedEnneagramType)?.slice(-1)||null;
       const commonTraits:string[]=[];
@@ -128,7 +133,7 @@ export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<G
       const testResults:DiscoverUserItem['testResults']=[];
       if(mbti) testResults.push({id:`confirmed-mbti-${user.id}`,testType:'MBTI',resultName:mbti,details:null});
       if(core) testResults.push({id:`confirmed-enneagram-${user.id}`,testType:'ENNEAGRAM',resultName:`Type ${core}`,details:null});
-      return {id:user.id,clerkId:user.clerkId,username:user.username,createdAt:user.createdAt,avatarUrl:user.avatarUrl,bio:user.bio,hobbies:user.hobbies,location:user.location,testResults,commonTraits,isMatched:commonTraits.length>0,friendStatus:statuses.get(user.id)||'NONE'};
+      return {id:user.id,clerkId:user.clerkId,username:user.username,displayName:user.displayName,interestCodes:user.interestCodes,age:user.age,zodiacSign:user.zodiacSign,createdAt:user.createdAt,avatarUrl:user.avatarUrl,bio:user.bio,hobbies:user.hobbies,location:user.location,testResults,commonTraits,isMatched:commonTraits.length>0,friendStatus:statuses.get(user.id)||'NONE'};
     });
     return {success:true,currentUserId:me.id,users,hasMore:rows.length>DISCOVER_PAGE_SIZE,nextCursor:rows.length>DISCOVER_PAGE_SIZE?page.at(-1)?.id:undefined};
   } catch(error) {

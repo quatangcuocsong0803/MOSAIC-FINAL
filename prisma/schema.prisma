@@ -12,11 +12,29 @@ datasource db {
 // USER
 // ============================================================
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
   username  String?  @unique
   createdAt DateTime @default(now())
+
+  displayName String?
+  interestCodes String[] @default([])
+  usernameVisibility ProfileVisibility @default(PUBLIC)
+  displayNameVisibility ProfileVisibility @default(PUBLIC)
+  avatarUrlVisibility ProfileVisibility @default(PUBLIC)
+  dateOfBirthVisibility ProfileVisibility @default(PRIVATE)
+  bioVisibility ProfileVisibility @default(PUBLIC)
+  hobbiesVisibility ProfileVisibility @default(PUBLIC)
+  locationVisibility ProfileVisibility @default(PRIVATE)
+  onboardingStep Int @default(0)
+  onboardingCompletedAt DateTime?
 
   // Thông tin profile
   dateOfBirth DateTime?

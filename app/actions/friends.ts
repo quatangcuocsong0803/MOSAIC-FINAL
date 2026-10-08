@@ -1,5 +1,7 @@
 "use server";
 
+import { visibleProfile } from "@/lib/profile-policy";
+import { discoverSelect } from "@/lib/discover/query";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { isBlockedBetween } from "@/lib/blocks";
@@ -80,6 +82,7 @@ export async function getFriendProfile(targetUserId: string) {
       id: targetUserId,
     },
     select: {
+      ...discoverSelect,
       id: true,
       username: true,
       createdAt: true,
@@ -105,6 +108,6 @@ export async function getFriendProfile(targetUserId: string) {
 
   return {
     success: true as const,
-    profile,
+    profile: visibleProfile(profile, false, true),
   };
 }

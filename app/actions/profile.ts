@@ -3,9 +3,14 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { ZODIAC_SIGNS } from "@/lib/zodiac";
+import { birthFacts, PRIVATE_FIELDS, type VisibilitySettings } from "@/lib/profile-policy";
+import { ensureUser } from "@/lib/ensure-user";
 
 export interface UpdateUserProfileInput {
+  username?: string | null;
+  displayName?: string | null;
+  interestCodes?: string[];
+  visibility?: Partial<VisibilitySettings>;
   dateOfBirth?: string | Date | null;
   zodiacSign?: string | null;
   hobbies?: string | null;
@@ -36,6 +41,12 @@ export interface UserProfileData {
   id: string;
   clerkId: string;
   username: string | null;
+  displayName: string | null;
+  interestCodes: string[];
+  visibility: VisibilitySettings;
+  age: number | null;
+  onboardingStep: number;
+  onboardingCompletedAt: Date | null;
   dateOfBirth: Date | null;
   zodiacSign: string | null;
   hobbies: string | null;
@@ -320,38 +331,9 @@ async function getOrCreateCurrentUser(
     return user;
   }
 
-  const clerkUser =
-    await currentUser();
-
-  let username =
-    clerkUser?.username ||
-    [
-      clerkUser?.firstName,
-      clerkUser?.lastName,
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-  if (!username) {
-    username =
-      `user_${clerkId.slice(-6)}`;
-  }
-
-  user =
-    await prisma.user.create({
-      data: {
-        clerkId,
-        username,
-      },
-
-      include: {
-        testResults: {
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-      },
-    });
+  const clerkUser = await currentUser();
+  await ensureUser(clerkId, clerkUser?.fullName);
+  user = await prisma.user.findUniqueOrThrow({where:{clerkId},include:{testResults:{orderBy:{createdAt:"desc"}}}});
 
   return user;
 }
@@ -363,8 +345,14 @@ function serializeUserProfile(
     id: user.id,
     clerkId: user.clerkId,
     username: user.username,
+    displayName: user.displayName ?? user.username,
+    interestCodes: user.interestCodes ?? [],
+    visibility: Object.fromEntries(PRIVATE_FIELDS.map(field => [field, user[`${field}Visibility`]])) as VisibilitySettings,
+    age: birthFacts(user.dateOfBirth).age,
+    onboardingStep: user.onboardingStep,
+    onboardingCompletedAt: user.onboardingCompletedAt,
     dateOfBirth: user.dateOfBirth,
-    zodiacSign: user.zodiacSign,
+    zodiacSign: birthFacts(user.dateOfBirth).zodiacSign,
     hobbies: user.hobbies,
     location: user.location,
     bio: user.bio,
@@ -656,30 +644,39 @@ export async function updateUserProfile(
           !isNaN(
             date.getTime()
           )
-        ) {
+) {
+          if (date > new Date() || date.getUTCFullYear() < 1900) return {success:false,error:"Ngày sinh không hợp lệ."};
           parsedDob = date;
-        }
+        } else return {success:false,error:"Ngày sinh không hợp lệ."};
       }
 
       data.dateOfBirth =
         parsedDob;
     }
 
-    if (
-      input.zodiacSign !==
-      undefined
-    ) {
-      data.zodiacSign =
-        input.zodiacSign &&
-        (
-          ZODIAC_SIGNS as readonly string[]
-        ).includes(
-          input.zodiacSign
-        )
-          ? input.zodiacSign
-          : null;
+    // Ignore client-supplied zodiac; derive it from DOB only.
+    if (input.dateOfBirth !== undefined) data.zodiacSign = birthFacts(data.dateOfBirth as Date | null).zodiacSign;
+    if (input.username !== undefined) {
+      const username = input.username?.trim().toLowerCase();
+      if (!username || !/^[a-z0-9_]{3,30}$/.test(username)) return {success:false,error:"Username cần 3–30 chữ cái, số hoặc dấu gạch dưới."};
+      data.username = username;
     }
-
+    if (input.displayName !== undefined) {
+      const name = input.displayName?.trim();
+      if (!name || name.length > 80) return {success:false,error:"Tên hiển thị cần 1–80 ký tự."};
+      data.displayName = name;
+    }
+    if (input.interestCodes !== undefined) {
+      if (!Array.isArray(input.interestCodes) || input.interestCodes.length > 50 || input.interestCodes.some(code => typeof code !== 'string' || !/^[a-z0-9-]{1,60}$/.test(code))) return {success:false,error:"Sở thích không hợp lệ."};
+      data.interestCodes = [...new Set(input.interestCodes)];
+    }
+    if (input.visibility !== undefined) {
+      if (!input.visibility || typeof input.visibility !== 'object') return {success:false,error:"Quyền hiển thị không hợp lệ."};
+      for (const [field, value] of Object.entries(input.visibility)) {
+        if (!(PRIVATE_FIELDS as readonly string[]).includes(field) || !['PUBLIC','FRIENDS','PRIVATE'].includes(value)) return {success:false,error:"Quyền hiển thị không hợp lệ."};
+        data[`${field}Visibility`] = value;
+      }
+    }
     if (
       input.hobbies !==
       undefined
@@ -720,38 +717,12 @@ export async function updateUserProfile(
         );
     }
 
-    const clerkUser =
-      await currentUser();
-
-    let defaultUsername =
-      clerkUser?.username ||
-      [
-        clerkUser?.firstName,
-        clerkUser?.lastName,
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-    if (!defaultUsername) {
-      defaultUsername =
-        `user_${userId.slice(-6)}`;
-    }
+    await getOrCreateCurrentUser(userId);
 
     const updatedUser =
-      await prisma.user.upsert({
-        where: {
-          clerkId: userId,
-        },
-
-        update:
-          data,
-
-        create: {
-          clerkId: userId,
-          username:
-            defaultUsername,
-          ...data,
-        },
+      await prisma.user.update({
+        where: { clerkId: userId },
+        data,
 
         include: {
           testResults: {
@@ -774,6 +745,7 @@ export async function updateUserProfile(
         ),
     };
   } catch (error: any) {
+    if (error?.code === "P2002") return {success:false,error:"Username đã được sử dụng."};
     console.error(
       "Lỗi cập nhật profile:",
       error
