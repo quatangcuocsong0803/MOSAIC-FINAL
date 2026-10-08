@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 export type DiscoverTab='suggested'|'community'|'requests'|'friends';
 export type DiscoverOptions={tab?:DiscoverTab;query?:string;type?:string;after?:string};
 export const DISCOVER_PAGE_SIZE=24;
-export const discoverSelect={id:true,clerkId:true,username:true,mid:true,createdAt:true,displayName:true,interestCodes:true,dateOfBirth:true,usernameVisibility:true,displayNameVisibility:true,avatarUrlVisibility:true,dateOfBirthVisibility:true,bioVisibility:true,hobbiesVisibility:true,locationVisibility:true,avatarUrl:true,bio:true,hobbies:true,location:true,confirmedMbtiType:true,confirmedEnneagramType:true} satisfies Prisma.UserSelect;
+export const discoverSelect={id:true,clerkId:true,username:true,mid:true,socionicsType:true,attitudinalPsyche:true,instinctStack:true,moralAlignment:true,temperament:true,sloanType:true,createdAt:true,displayName:true,interestCodes:true,dateOfBirth:true,usernameVisibility:true,displayNameVisibility:true,avatarUrlVisibility:true,dateOfBirthVisibility:true,bioVisibility:true,hobbiesVisibility:true,locationVisibility:true,avatarUrl:true,bio:true,hobbies:true,location:true,confirmedMbtiType:true,confirmedEnneagramType:true} satisfies Prisma.UserSelect;
 export function enneagramFilter(core:string): Prisma.UserWhereInput {
   // Match the core at the start, not a wing such as the 5 in Type 4w5.
   return {OR:[{confirmedEnneagramType:{startsWith:core}},{confirmedEnneagramType:{startsWith:`Type ${core}`,mode:'insensitive'}},{confirmedEnneagramType:{startsWith:`Type${core}`,mode:'insensitive'}}]};

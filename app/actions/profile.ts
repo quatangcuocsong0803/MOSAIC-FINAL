@@ -4,6 +4,8 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { birthFacts, PRIVATE_FIELDS, type VisibilitySettings } from "@/lib/profile-policy";
+import { INTEREST_CODES, interestLabels } from "@/lib/interests";
+import { validateExtraTypology, type TypologyInput } from "@/lib/typology";
 import { formatMid } from "@/lib/mid";
 import { ensureUser } from "@/lib/ensure-user";
 
@@ -42,6 +44,12 @@ export interface UserProfileData {
   id: string;
   clerkId: string;
   username: string | null;
+  socionicsType: string | null;
+  attitudinalPsyche: string | null;
+  instinctStack: string | null;
+  moralAlignment: string | null;
+  temperament: string | null;
+  sloanType: string | null;
   mid: string;
   displayName: string | null;
   interestCodes: string[];
@@ -348,6 +356,12 @@ function serializeUserProfile(
     clerkId: user.clerkId,
     username: user.username,
     mid: formatMid(user.mid),
+    socionicsType: user.socionicsType,
+    attitudinalPsyche: user.attitudinalPsyche,
+    instinctStack: user.instinctStack,
+    moralAlignment: user.moralAlignment,
+    temperament: user.temperament,
+    sloanType: user.sloanType,
     displayName: user.displayName ?? user.username,
     interestCodes: user.interestCodes ?? [],
     visibility: Object.fromEntries(PRIVATE_FIELDS.map(field => [field, user[`${field}Visibility`]])) as VisibilitySettings,
@@ -670,8 +684,9 @@ export async function updateUserProfile(
       data.displayName = name;
     }
     if (input.interestCodes !== undefined) {
-      if (!Array.isArray(input.interestCodes) || input.interestCodes.length > 50 || input.interestCodes.some(code => typeof code !== 'string' || !/^[a-z0-9-]{1,60}$/.test(code))) return {success:false,error:"Sở thích không hợp lệ."};
+      if (!Array.isArray(input.interestCodes) || input.interestCodes.length > 50 || input.interestCodes.some(code => typeof code !== 'string' || !INTEREST_CODES.has(code))) return {success:false,error:"Sở thích không hợp lệ."};
       data.interestCodes = [...new Set(input.interestCodes)];
+      data.hobbies = interestLabels(data.interestCodes as string[]) || null;
     }
     if (input.visibility !== undefined) {
       if (!input.visibility || typeof input.visibility !== 'object') return {success:false,error:"Quyền hiển thị không hợp lệ."};
@@ -682,7 +697,7 @@ export async function updateUserProfile(
     }
     if (
       input.hobbies !==
-      undefined
+      undefined && input.interestCodes === undefined
     ) {
       data.hobbies =
         trimOrNull(
@@ -1372,4 +1387,18 @@ export async function confirmTestPersonalityType({
         "Không thể dùng kết quả test này làm personality hiển thị lúc này.",
     };
   }
+}
+
+/** Validate all typology systems before writing; extra systems always public. */
+export async function saveTypology(input: TypologyInput) {
+  try {
+    const {userId}=await auth();
+    if(!userId)return {success:false as const,error:"Vui lòng đăng nhập lại."};
+    const extras=validateExtraTypology(input);
+    const result=await saveManualPersonalityTypes(input);
+    if(!result.success)return result;
+    await prisma.user.update({where:{clerkId:userId},data:extras});
+    revalidatePersonalityPaths();
+    return getUserProfile();
+  }catch{return {success:false as const,error:"Typology không hợp lệ hoặc chưa lưu được."};}
 }

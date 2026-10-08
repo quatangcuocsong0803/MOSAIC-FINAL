@@ -25,6 +25,12 @@ model User {
   username  String?  @unique
   createdAt DateTime @default(now())
 
+  socionicsType String?
+  attitudinalPsyche String?
+  instinctStack String?
+  moralAlignment String?
+  temperament String?
+  sloanType String?
   displayName String?
   interestCodes String[] @default([])
   usernameVisibility ProfileVisibility @default(PUBLIC)

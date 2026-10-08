@@ -1,3 +1,4 @@
+import {EXTRA_TYPOLOGY_FIELDS} from "@/lib/typology";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -160,6 +161,7 @@ export default async function FriendProfilePage({
                   </span>
                 )}
 
+                {EXTRA_TYPOLOGY_FIELDS.map(field=>profile[field]&&<span key={field} className="rounded-full border border-[#8B6B4A]/30 px-3 py-1.5 text-xs">{profile[field]}</span>)}
                 {!profile.confirmedMbtiType &&
                   !profile.confirmedEnneagramType && (
                     <p className="text-xs text-[#A89F91]">
