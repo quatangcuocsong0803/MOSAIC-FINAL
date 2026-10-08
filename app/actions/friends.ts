@@ -70,13 +70,6 @@ export async function getFriendProfile(targetUserId: string) {
     },
   });
 
-  if (!friendship) {
-    return {
-      success: false as const,
-      reason: "NOT_FRIENDS" as const,
-    };
-  }
-
   const profile = await prisma.user.findUnique({
     where: {
       id: targetUserId,
@@ -108,6 +101,7 @@ export async function getFriendProfile(targetUserId: string) {
 
   return {
     success: true as const,
-    profile: visibleProfile(profile, false, true),
+    isFriend: Boolean(friendship),
+    profile: visibleProfile(profile, false, Boolean(friendship)),
   };
 }

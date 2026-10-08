@@ -111,7 +111,7 @@ export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<G
     currentId=me.id;
     const myMbti=normalizeMbti(me.confirmedMbtiType);
     const myCore=normalizeEnneagramCore(me.confirmedEnneagramType)?.slice(-1) || null;
-    const tab=['suggested','requests','community'].includes(options.tab||'')?options.tab:'community';
+    const tab=['suggested','requests','community','friends'].includes(options.tab||'')?options.tab:'community';
     const after=typeof options.after==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(options.after)?options.after:undefined;
     const [rows,friendships]=await Promise.all([
       prisma.user.findMany({where:discoverWhere(me.id,myMbti,myCore,{...options,tab}),select:discoverSelect,orderBy:[{createdAt:'desc'},{id:'desc'}],take:DISCOVER_PAGE_SIZE+1,...(after?{cursor:{id:after},skip:1}:{})}),

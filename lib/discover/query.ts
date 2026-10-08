@@ -1,6 +1,6 @@
 import {visibleFieldWhere} from '@/lib/profile-policy';
 import type { Prisma } from '@prisma/client';
-export type DiscoverTab='suggested'|'community'|'requests';
+export type DiscoverTab='suggested'|'community'|'requests'|'friends';
 export type DiscoverOptions={tab?:DiscoverTab;query?:string;type?:string;after?:string};
 export const DISCOVER_PAGE_SIZE=24;
 export const discoverSelect={id:true,clerkId:true,username:true,mid:true,createdAt:true,displayName:true,interestCodes:true,dateOfBirth:true,usernameVisibility:true,displayNameVisibility:true,avatarUrlVisibility:true,dateOfBirthVisibility:true,bioVisibility:true,hobbiesVisibility:true,locationVisibility:true,avatarUrl:true,bio:true,hobbies:true,location:true,confirmedMbtiType:true,confirmedEnneagramType:true} satisfies Prisma.UserSelect;
@@ -16,6 +16,7 @@ export function discoverWhere(id:string,mbti:string|null,enneagram:string|null,o
     if(enneagram) OR.push(enneagramFilter(enneagram));
     if(!OR.length) conditions.push({id:{in:[]}});else conditions.push({OR});
   }
+  if(options.tab==='friends') conditions.push({OR:[{sentRequests:{some:{receiverId:id,status:'ACCEPTED'}}},{receivedRequests:{some:{senderId:id,status:'ACCEPTED'}}}]});
   if(options.tab==='requests') conditions.push({sentRequests:{some:{receiverId:id,status:'PENDING'}},NOT:{OR:[{sentRequests:{some:{receiverId:id,status:'ACCEPTED'}}},{receivedRequests:{some:{senderId:id,status:'ACCEPTED'}}}]}});
   const type=options.type?.trim()||'';
   if(/^[IE][NS][TF][JP]$/i.test(type)) conditions.push({confirmedMbtiType:{equals:type.toUpperCase(),mode:'insensitive'}});

@@ -58,7 +58,7 @@ export default async function FriendProfilePage({
   const { profile } = result;
 
   const displayName =
-    profile.username ||
+    profile.displayName || profile.username ||
     `Thành viên #${profile.id.slice(-4)}`;
 
   const avatarLetter =
@@ -84,7 +84,7 @@ export default async function FriendProfilePage({
 
             <div className="min-w-0">
               <p className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-[#A89F91]">
-                Friend Profile
+                MOSAIC Profile
               </p>
 
               <h1 className="truncate font-serif text-3xl font-bold text-[#5C4326] md:text-4xl">
@@ -92,7 +92,7 @@ export default async function FriendProfilePage({
               </h1>
 
               <p className="mt-2 text-sm text-[#8B7355]">
-                Bạn bè trên MOSAIC
+                {profile.username ? `@${profile.username} · ` : ""}MID {String(profile.mid).padStart(7,"0")}
               </p>
             </div>
           </div>
@@ -109,6 +109,7 @@ export default async function FriendProfilePage({
                 "Người dùng chưa thêm phần giới thiệu."}
             </p>
 
+            {profile.age !== null && <p className="mt-3">{profile.age} tuổi</p>}
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               <ProfileField
                 label="Địa điểm"
@@ -169,10 +170,10 @@ export default async function FriendProfilePage({
             </div>
 
             <div className="mt-5">
-              <FriendProfileActions
+              {result.isFriend && <FriendProfileActions
                 targetUserId={profile.id}
                 displayName={displayName}
-              />
+              />}
             </div>
 
             <div className="mt-5">

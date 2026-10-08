@@ -19,6 +19,7 @@ import { prepareAvatar } from "@/lib/avatar/prepare";
 import { notifyAvatarUpdated } from "@/lib/avatar-events";
 import type { Post, Comment } from "@prisma/client";
 import { ZODIAC_ICONS } from "@/lib/zodiac";
+import FriendsList from "@/src/components/friends/FriendsList";
 import ProfileFormModal from "@/src/components/ProfileFormModal";
 import CommentSection from "@/src/components/discussion/CommentSection";
 import LikeButton from "@/src/components/discussion/LikeButton";
@@ -1606,6 +1607,8 @@ export default function ProfilePage() {
       </div>
 
       {/* Modal chỉnh sửa hồ sơ */}
+      <p className="px-4 text-sm text-[#8B6B4A]">{profileDetails?.username ? `@${profileDetails.username} · ` : ""}MID {profileDetails?.mid} {profileDetails?.age != null ? `· ${profileDetails.age} tuổi` : ""}</p>
+      <FriendsList />
       <ProfileFormModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
