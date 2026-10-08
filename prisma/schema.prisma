@@ -20,6 +20,7 @@ enum ProfileVisibility {
 
 model User {
   id        String   @id @default(cuid())
+  mid       Int      @unique @default(autoincrement())
   clerkId   String   @unique
   username  String?  @unique
   createdAt DateTime @default(now())

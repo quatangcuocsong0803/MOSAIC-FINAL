@@ -1,5 +1,6 @@
 "use server";
 
+import { formatMid } from "@/lib/mid";
 import { visibleProfile } from "@/lib/profile-policy";
 import { ensureUser } from "@/lib/ensure-user";
 import { auth, currentUser } from "@clerk/nextjs/server";
@@ -22,6 +23,7 @@ export interface DiscoverUserItem {
   id: string;
   clerkId: string;
   username: string | null;
+  mid?: string;
   displayName?: string | null;
   interestCodes?: string[];
   age?: number | null;
@@ -133,7 +135,7 @@ export async function getDiscoverUsers(options: DiscoverOptions = {}): Promise<G
       const testResults:DiscoverUserItem['testResults']=[];
       if(mbti) testResults.push({id:`confirmed-mbti-${user.id}`,testType:'MBTI',resultName:mbti,details:null});
       if(core) testResults.push({id:`confirmed-enneagram-${user.id}`,testType:'ENNEAGRAM',resultName:`Type ${core}`,details:null});
-      return {id:user.id,clerkId:user.clerkId,username:user.username,displayName:user.displayName,interestCodes:user.interestCodes,age:user.age,zodiacSign:user.zodiacSign,createdAt:user.createdAt,avatarUrl:user.avatarUrl,bio:user.bio,hobbies:user.hobbies,location:user.location,testResults,commonTraits,isMatched:commonTraits.length>0,friendStatus:statuses.get(user.id)||'NONE'};
+      return {id:user.id,clerkId:user.clerkId,username:user.username,mid:formatMid(user.mid),displayName:user.displayName,interestCodes:user.interestCodes,age:user.age,zodiacSign:user.zodiacSign,createdAt:user.createdAt,avatarUrl:user.avatarUrl,bio:user.bio,hobbies:user.hobbies,location:user.location,testResults,commonTraits,isMatched:commonTraits.length>0,friendStatus:statuses.get(user.id)||'NONE'};
     });
     return {success:true,currentUserId:me.id,users,hasMore:rows.length>DISCOVER_PAGE_SIZE,nextCursor:rows.length>DISCOVER_PAGE_SIZE?page.at(-1)?.id:undefined};
   } catch(error) {

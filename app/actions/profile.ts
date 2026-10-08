@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { birthFacts, PRIVATE_FIELDS, type VisibilitySettings } from "@/lib/profile-policy";
+import { formatMid } from "@/lib/mid";
 import { ensureUser } from "@/lib/ensure-user";
 
 export interface UpdateUserProfileInput {
@@ -41,6 +42,7 @@ export interface UserProfileData {
   id: string;
   clerkId: string;
   username: string | null;
+  mid: string;
   displayName: string | null;
   interestCodes: string[];
   visibility: VisibilitySettings;
@@ -345,6 +347,7 @@ function serializeUserProfile(
     id: user.id,
     clerkId: user.clerkId,
     username: user.username,
+    mid: formatMid(user.mid),
     displayName: user.displayName ?? user.username,
     interestCodes: user.interestCodes ?? [],
     visibility: Object.fromEntries(PRIVATE_FIELDS.map(field => [field, user[`${field}Visibility`]])) as VisibilitySettings,
