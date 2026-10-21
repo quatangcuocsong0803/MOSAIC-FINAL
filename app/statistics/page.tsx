@@ -37,7 +37,7 @@ export default async function StatisticsPage() {
                 .map(([type, count]) => (
                   <div
                     key={type}
-                    className="my-2 flex justify-between rounded-lg bg-[#F2E6C6] px-4 py-2"
+                    className="my-2 flex justify-between rounded-lg bg-[#F8F5EE] px-4 py-2"
                   >
                     <span>{type}</span>
                     <strong>{count}</strong>

@@ -100,7 +100,7 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto my-8 w-full max-w-6xl space-y-8 px-4">
       <section className="mosaic-profile-card overflow-hidden !p-0">
-        <div className="relative h-48 bg-gradient-to-r from-[#d8c59d] to-[#efe1b9] md:h-72">
+        <div className="relative h-48 bg-gradient-to-r from-[#E6DED0] to-[#F8F5EE] md:h-72">
           {profile.coverUrl && (
             <img
               src={profile.coverUrl}
@@ -108,7 +108,7 @@ export default function ProfilePage() {
               className="h-full w-full object-cover"
             />
           )}
-          <label className="absolute bottom-4 right-4 cursor-pointer rounded-xl bg-[#fffaf0]/95 px-4 py-2 text-sm shadow">
+          <label className="absolute bottom-4 right-4 cursor-pointer rounded-xl bg-[#F8F5EE]/95 px-4 py-2 text-sm shadow">
             {busy ? "Đang tải…" : "Đổi ảnh bìa"}
             <input
               type="file"
@@ -193,7 +193,7 @@ export default function ProfilePage() {
                 .map((value) => (
                   <span
                     key={value}
-                    className="rounded-full border border-[#C5A772] bg-[#F8EBCB] px-3 py-1.5 text-sm"
+                    className="rounded-full border border-[#C5A772] bg-[#F8F5EE] px-3 py-1.5 text-sm"
                   >
                     {value}
                   </span>

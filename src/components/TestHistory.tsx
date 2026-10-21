@@ -100,7 +100,7 @@ export default function TestHistory({
               return (
                 <article
                   key={r.id}
-                  className="rounded-2xl border border-[#DCC89E] bg-[#fffaf0]/90 p-4"
+                  className="rounded-2xl border border-[#DCC89E] bg-[#F8F5EE]/90 p-4"
                 >
                   <div className="flex gap-4">
                     {image && (

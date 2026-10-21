@@ -114,7 +114,7 @@ export default function MomentsFeed({
       </h2>
       {owner && (
         <form
-          className="space-y-4 rounded-2xl border border-[#C9AE77] bg-[#fffaf0]/80 p-4"
+          className="space-y-4 rounded-2xl border border-[#C9AE77] bg-[#F8F5EE]/80 p-4"
           onSubmit={(e) => {
             e.preventDefault();
             void post();
@@ -196,7 +196,7 @@ export default function MomentsFeed({
       {items.map((item) => (
         <article
           key={item.id}
-          className="space-y-4 rounded-2xl border border-[#DCC89E] bg-[#fffaf0]/85 p-5"
+          className="space-y-4 rounded-2xl border border-[#DCC89E] bg-[#F8F5EE]/85 p-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <time dateTime={new Date(item.createdAt).toISOString()}>
