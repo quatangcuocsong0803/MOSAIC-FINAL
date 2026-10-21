@@ -99,3 +99,50 @@ export async function saveOnboardingStep(
     };
   }
 }
+
+/** One explicit checkpoint for the entire local draft. Next/back never call this. */
+export async function saveOnboardingDraft(
+  step: number,
+  complete: boolean,
+  input: UpdateUserProfileInput,
+  typology: import("@/lib/typology").TypologyInput,
+) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: "Vui lòng đăng nhập lại." };
+    const { validateOnboardingDraft } = await import(
+      "@/lib/onboarding-validation"
+    );
+    const data = validateOnboardingDraft(input, typology, complete);
+    if (!Number.isInteger(step) || step < 0 || step > 7)
+      throw Error("Tiến độ không hợp lệ.");
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUniqueOrThrow({
+        where: { clerkId: userId },
+      });
+      if (current.onboardingCompletedAt)
+        throw Error("Hồ sơ đã hoàn thành. Hãy mở trang hồ sơ để chỉnh sửa.");
+      await tx.user.update({
+        where: { id: current.id },
+        data: {
+          ...data,
+          onboardingStep: complete ? 8 : step,
+          onboardingCompletedAt: complete ? new Date() : null,
+        },
+      });
+    });
+    revalidatePath("/profile");
+    return getUserProfile();
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    return {
+      success: false,
+      error:
+        code === "P2002"
+          ? "Username đã được sử dụng. Hãy chọn tên khác."
+          : e instanceof Error && !(e as { code?: string }).code
+            ? e.message
+            : "Chưa lưu được. Bản nháp vẫn còn trên thiết bị này.",
+    };
+  }
+}

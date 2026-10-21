@@ -474,3 +474,5 @@
 
 /* Match the homepage decoration preference. */
 :global(html[data-show-decorations="false"]) .page { background:#f8f5ee; }
+
+.toc {background:rgba(248,245,238,.96);border:1px solid var(--accent-line);border-radius:12px;padding:20px;color:var(--ink);}

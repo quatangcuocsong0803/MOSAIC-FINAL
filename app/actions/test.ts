@@ -362,3 +362,27 @@ export async function revokeStatisticsConsent(testResultId: string): Promise<{
     };
   }
 }
+
+/** Opt-in/revoke applies only to this attempt, independently from profile identity. */
+export async function setTestStatisticsConsent(id: string, consent: boolean) {
+  try {
+    const { userId } = await auth();
+    if (!userId || typeof consent !== "boolean") return { success: false };
+    const result = await prisma.testResult.updateMany({
+      where: { id, user: { clerkId: userId } },
+      data: consent
+        ? {
+            statisticsConsent: true,
+            statisticsConsentVersion: STATISTICS_CONSENT_VERSION,
+            statisticsConsentedAt: new Date(),
+            statisticsConsentRevokedAt: null,
+          }
+        : { statisticsConsent: false, statisticsConsentRevokedAt: new Date() },
+    });
+    revalidatePath("/statistics");
+    revalidatePath("/profile");
+    return { success: result.count === 1 };
+  } catch {
+    return { success: false };
+  }
+}

@@ -23,7 +23,7 @@ export default function InterestPicker({
         />
       </label>
       <p className="text-sm" aria-live="polite">
-        Đã chọn {value.length} / 50 · Có thể chọn nhiều
+        Đã chọn {value.length} / 7 · Chọn tối đa 7 sở thích
       </p>
       <div className="max-h-72 overflow-y-auto">
         {INTEREST_GROUPS.map((group) => {
@@ -44,7 +44,7 @@ export default function InterestPicker({
                     <input
                       type="checkbox"
                       checked={value.includes(code)}
-                      disabled={value.length >= 50 && !value.includes(code)}
+                      disabled={value.length >= 7 && !value.includes(code)}
                       onChange={(e) =>
                         onChange(
                           e.target.checked

@@ -50,6 +50,10 @@ model User {
   location    String?
   bio         String?
   avatarUrl   String?
+  coverUrl    String?
+  moments     Moment[]
+  momentUploads MomentUpload[]
+  identityConsents IdentityStatisticsConsent[]
   settings    UserSettings?
   // ==========================================================
   // PERSONALITY TYPE HIỂN THỊ / ĐÃ XÁC NHẬN
@@ -910,4 +914,45 @@ model KnowledgeSearchDaily {
  day String
  @@id([clerkId, href, day])
  @@index([href])
+}
+
+// A consent snapshot belongs to a confirmed identity, never to a test attempt.
+model IdentityStatisticsConsent {
+  userId String
+  kind String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  value String
+  source String
+  testResultId String?
+  consentedAt DateTime @default(now())
+  revokedAt DateTime?
+  version String @default("identity-statistics-v1")
+  @@id([userId,kind])
+}
+
+model Moment {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  content String
+  visibility ProfileVisibility @default(PRIVATE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  media MomentUpload[]
+  @@index([userId,createdAt,id])
+}
+
+// Files stay in a private bucket. Visibility is checked again on every read.
+model MomentUpload {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  path String @unique
+  mimeType String
+  bytes Int
+  finalized Boolean @default(false)
+  createdAt DateTime @default(now())
+  momentId String?
+  moment Moment? @relation(fields:[momentId],references:[id],onDelete:Cascade)
+  @@index([userId,createdAt])
 }

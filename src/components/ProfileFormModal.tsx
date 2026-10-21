@@ -181,7 +181,7 @@ export default function ProfileFormModal({
           {title}
         </h2>
         <p className="mt-2 text-sm">
-          Tuổi và cung hoàng đạo tự tính từ ngày sinh. Typology đã điền luôn
+          Bạn có thể cập nhật hồ sơ và quyền xem tại đây. Typology đã điền luôn
           công khai.
         </p>
         {error && (

@@ -106,7 +106,7 @@ export default function LongformPage({ article, tone = "gold", related }: Longfo
   const readingMinutes = Math.max(1, Math.round(countWords(article) / 220));
 
   return (
-    <div className={`${styles.page} ${styles[tone]}`}>
+    <div className={`${styles.page} ${styles[tone]} mosaic-editorial-page`}>
       <div className={styles.paper}>
         <div className={styles.breadcrumbs}>
           <Link href="/">Trang chủ</Link>
