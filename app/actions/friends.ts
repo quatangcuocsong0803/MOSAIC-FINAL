@@ -61,6 +61,7 @@ export async function getFriendProfile(targetUserId: string) {
       username: true,
       createdAt: true,
       avatarUrl: true,
+      coverUrl: true,
       bio: true,
       location: true,
       hobbies: true,

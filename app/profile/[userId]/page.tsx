@@ -1,3 +1,4 @@
+import MomentsFeed from "@/src/components/MomentsFeed";
 import { EXTRA_TYPOLOGY_FIELDS } from "@/lib/typology";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -61,6 +62,13 @@ export default async function FriendProfilePage({
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-10 md:py-14">
       <div className="overflow-hidden rounded-3xl border border-[#E2D4B7] bg-white shadow-sm">
+        {profile.coverUrl && (
+          <img
+            src={profile.coverUrl}
+            alt="Ảnh bìa"
+            className="h-48 w-full object-cover md:h-64"
+          />
+        )}
         <div className="border-b border-[#E2D4B7] bg-[#FCFBF8] px-6 py-8 md:px-10">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#8B6B4A]/40 bg-white font-serif text-3xl font-bold text-[#8B6B4A]">
@@ -187,6 +195,9 @@ export default async function FriendProfilePage({
             </div>
           </aside>
         </div>
+      </div>
+      <div className="mt-8">
+        <MomentsFeed ownerId={profile.id} />
       </div>
     </main>
   );

@@ -1,4 +1,5 @@
 import "./globals.css";
+import FeatureCanvas from "@/src/components/FeatureCanvas";
 import DisplayPreferences from "@/src/components/settings/DisplayPreferences";
 import { Suspense } from "react";
 import NavigationFeedback from "@/src/components/navigation/NavigationFeedback";
@@ -126,7 +127,7 @@ export default function RootLayout({
           <Navbar />
           <OnboardingGate />
           <main className="w-full flex flex-col items-center relative z-10 bg-transparent">
-            {children}
+            <FeatureCanvas>{children}</FeatureCanvas>
           </main>
         </body>
       </html>
