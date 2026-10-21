@@ -167,3 +167,20 @@ The eight scenes are defined in `OnboardingDecorations.tsx`. Browser layout chec
 use the real wizard with mocked routing/actions, not a real Clerk session. The
 1440 px desktop and 390 px mobile renders load all displayed artwork and have no
 horizontal overflow. No new database migration or production deployment is needed.
+
+
+## Production release build
+
+Vercel uses `vercel.json` to run `scripts/vercel-build.mjs`. Preview and local
+builds only build Next.js. For Production, the script first verifies that
+DATABASE_URL, DIRECT_URL and the public Supabase URL identify the same existing
+project, refuses the known mosaic-preview project, and requires a direct/session
+migration connection. It then runs Prisma migrate deploy and migrate status
+before Next.js build. A migration/validation failure aborts the new deployment;
+there is no reset, db push, automatic baseline, or fallback to Preview data.
+Credentials in PostgreSQL URLs are redacted from captured CLI output.
+
+Production environment values remain managed in Vercel. They are neither copied
+from Preview nor stored in the repository. The three feature migrations backfill
+existing users and mark their onboarding complete; newly created users start at
+step zero. Reviewable release history is maintained through a pull request to main.
