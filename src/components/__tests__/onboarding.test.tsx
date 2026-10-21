@@ -27,9 +27,11 @@ vi.mock("@/app/actions/profile", () => ({
   saveTypology: state.types,
 }));
 vi.mock("@/app/actions/onboarding", () => ({ saveOnboardingStep: state.save }));
-import ProfileOnboardingModal from "../ProfileOnboardingModal";
+import ProfileOnboardingWizard from "../ProfileOnboardingWizard";
+import { onboardingPauseKey } from "@/lib/onboarding";
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   state.profile = {
     id: "ui-id",
     clerkId: "ui-member",
@@ -89,7 +91,7 @@ it("never requests location before explicit consent and offers manual location a
     value: { getCurrentPosition: geo },
   });
   const u = userEvent.setup();
-  render(<ProfileOnboardingModal />);
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
   await screen.findByRole("heading", { name: "Vị trí" });
   expect(geo).not.toHaveBeenCalled();
   await u.click(screen.getByRole("button", { name: "Không sử dụng" }));
@@ -104,32 +106,30 @@ it("never requests location before explicit consent and offers manual location a
   await u.click(
     screen.getByRole("button", { name: "Lưu tiến độ và tiếp tục sau" }),
   );
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(state.push).toHaveBeenCalledWith("/profile"));
+  expect(sessionStorage.getItem(onboardingPauseKey("ui-member"))).toBe("1");
   expect(state.profile.onboardingStep).toBe(3);
   expect(state.profile.location).toBe("Hà Nội, Việt Nam");
 });
 it("resumes saved progress and supports going back", async () => {
   state.profile.onboardingStep = 5;
   const u = userEvent.setup();
-  render(<ProfileOnboardingModal />);
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
   await screen.findByRole("heading", { name: "Giới thiệu" });
   await u.click(screen.getByRole("button", { name: "← Quay lại" }));
-  await screen.findByRole("heading", { name: "Ngày sinh" });
+  await waitFor(() => expect(state.push).toHaveBeenCalledWith("/onboarding/birthday?returnTo=%2Fprofile"));
   expect(state.profile.onboardingStep).toBe(4);
 });
-it("marks completion before navigating to Tests and does not open again", async () => {
+it("marks completion before navigating to Tests", async () => {
   state.profile.onboardingStep = 7;
   const u = userEvent.setup();
-  const view = render(<ProfileOnboardingModal />);
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
   await screen.findByRole("heading", { name: "Typology" });
   await u.click(screen.getByRole("button", { name: "Kiểm tra ngay →" }));
   await waitFor(() => expect(state.push).toHaveBeenCalledWith("/test"));
   expect(state.profile.onboardingCompletedAt).toBeTruthy();
   expect(state.types).toHaveBeenCalledOnce();
-  view.unmount();
-  render(<ProfileOnboardingModal />);
-  await waitFor(() => expect(state.get).toHaveBeenCalledTimes(2));
-  expect(screen.queryByRole("dialog")).toBeNull();
+
 });
 it("does not navigate when typology or progress fails to save", async () => {
   state.profile.onboardingStep = 7;
@@ -138,11 +138,40 @@ it("does not navigate when typology or progress fails to save", async () => {
     error: "Chưa lưu được typology.",
   });
   const u = userEvent.setup();
-  render(<ProfileOnboardingModal />);
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
   await screen.findByRole("heading", { name: "Typology" });
   await u.click(screen.getByRole("button", { name: "Kiểm tra ngay →" }));
   await screen.findByRole("alert");
   expect(state.push).not.toHaveBeenCalled();
   expect(state.save).not.toHaveBeenCalled();
   expect(state.profile.onboardingCompletedAt).toBeNull();
+});
+
+it("shows one full page, saves before advancing, and keeps input when saving fails", async () => {
+  state.profile.onboardingStep = 0;
+  state.save.mockResolvedValueOnce({ success: false, error: "Username đã tồn tại." });
+  const u = userEvent.setup();
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Username");
+  expect(screen.queryByLabelText("Ngày sinh")).toBeNull();
+  const input = screen.getByLabelText("Username duy nhất");
+  await u.clear(input);
+  await u.type(input, "mosaic_member");
+  await u.click(screen.getByRole("button", { name: "Tiếp tục →" }));
+  await screen.findByText("Username đã tồn tại.");
+  expect(state.push).not.toHaveBeenCalled();
+  expect((input as HTMLInputElement).value).toBe("mosaic_member");
+  await u.click(screen.getByRole("button", { name: "Tiếp tục →" }));
+  await waitFor(() => expect(state.push).toHaveBeenCalledWith("/onboarding/display-name?returnTo=%2Fprofile"));
+});
+it("does not leave the page or pause the flow when save for later fails", async () => {
+  state.save.mockRejectedValue(new Error("offline"));
+  const u = userEvent.setup();
+  render(<ProfileOnboardingWizard initialProfile={state.profile} />);
+  await u.click(screen.getByRole("button", { name: "Lưu tiến độ và tiếp tục sau" }));
+  await screen.findByRole("alert");
+  expect(state.push).not.toHaveBeenCalled();
+  expect(sessionStorage.getItem(onboardingPauseKey("ui-member"))).toBeNull();
 });

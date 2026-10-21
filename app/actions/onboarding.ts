@@ -90,6 +90,7 @@ export async function saveOnboardingStep(
         error: "Tiến độ đã thay đổi. Hãy tải lại trang.",
       };
     revalidatePath("/profile");
+    revalidatePath("/onboarding", "layout");
     return getUserProfile();
   } catch {
     return {

@@ -8,6 +8,25 @@ export const ONBOARDING_STEPS = [
   "Sở thích",
   "Typology",
 ] as const;
+export const ONBOARDING_SLUGS = [
+  "username", "display-name", "avatar", "location",
+  "birthday", "bio", "interests", "typology",
+] as const;
+
+export function onboardingPath(step: number, returnTo = "/profile") {
+  const slug = ONBOARDING_SLUGS[step];
+  if (!slug) throw new Error("Bước onboarding không hợp lệ.");
+  return `/onboarding/${slug}?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export function isOnboardingPath(path: string) {
+  return path === "/onboarding" || path.startsWith("/onboarding/");
+}
+
+export function onboardingPauseKey(userId: string) {
+  return `mosaic-onboarding-paused:${userId}`;
+}
+
 export function onboardingMove(
   current: number,
   direction: "next" | "back" | "save",

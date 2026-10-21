@@ -82,6 +82,8 @@ export default function Navbar() {
     setOpen(false);
   }
 
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return null;
+
   return (
     <>
       <UtilityBar />

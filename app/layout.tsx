@@ -22,7 +22,7 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import RememberReturn from "@/src/components/auth/RememberReturn";
 import Navbar from "@/src/components/Navbar";
-import ProfileOnboardingModal from "@/src/components/ProfileOnboardingModal";
+import OnboardingGate from "@/src/components/OnboardingGate";
 
 export const metadata: Metadata = {
   title: "MOSAIC",
@@ -40,7 +40,7 @@ export default function RootLayout({
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/onboarding"
     >
       <html lang="vi" className="bg-[#FCFBF8]">
         <body
@@ -124,7 +124,7 @@ export default function RootLayout({
           </Suspense>
           <RememberReturn />
           <Navbar />
-          <ProfileOnboardingModal />
+          <OnboardingGate />
           <main className="w-full flex flex-col items-center relative z-10 bg-transparent">
             {children}
           </main>

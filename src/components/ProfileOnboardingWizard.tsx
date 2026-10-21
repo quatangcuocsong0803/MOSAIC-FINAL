@@ -1,105 +1,61 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
+import styles from "./ProfileOnboardingWizard.module.css";
 import { useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
 import InterestPicker from "@/src/components/InterestPicker";
 import TypologyFields from "@/src/components/TypologyFields";
 import { typologyFromProfile, type TypologyInput } from "@/lib/typology";
 import {
-  getUserProfile,
   saveTypology,
   type UserProfileData,
   type UpdateUserProfileInput,
 } from "@/app/actions/profile";
 import { saveOnboardingStep } from "@/app/actions/onboarding";
-import { ONBOARDING_STEPS } from "@/lib/onboarding";
+import { ONBOARDING_STEPS, onboardingPath, onboardingPauseKey } from "@/lib/onboarding";
 import { birthFacts } from "@/lib/profile-policy";
 import { notifyAvatarUpdated } from "@/lib/avatar-events";
 const fieldClass =
   "mt-2 w-full rounded-xl border border-[#E2D4B7] bg-[#FAF8F5] p-3 text-[#5C4326]";
-export default function ProfileOnboardingModal() {
-  const { isLoaded, isSignedIn, user } = useUser();
+const descriptions = [
+  "Chọn một tên riêng để mọi người tìm thấy bạn trên MOSAIC.",
+  "Bạn muốn mọi người gọi mình là gì?",
+  "Thêm một hình ảnh để hồ sơ mang dấu ấn của bạn.",
+  "Chia sẻ nơi bạn sống, theo mức độ bạn thấy thoải mái.",
+  "MOSAIC sẽ tự tính tuổi và cung hoàng đạo từ ngày sinh của bạn.",
+  "Một vài dòng nhỏ để mọi người hiểu bạn hơn.",
+  "Những điều khiến bạn tò mò, say mê và muốn sẻ chia.",
+  "Điền những hệ tính cách bạn đã biết, hoặc khám phá sau bằng bài test.",
+];
+
+export default function ProfileOnboardingWizard({ initialProfile, returnTo = "/profile" }: {
+  initialProfile: UserProfileData;
+  returnTo?: string;
+}) {
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfileData | null>(null),
-    [draft, setDraft] = useState<UpdateUserProfileInput>({}),
-    [pending, setPending] = useState(false),
-    [error, setError] = useState(""),
-    [dismissed, setDismissed] = useState(false),
-    [country, setCountry] = useState(""),
-    [city, setCity] = useState(""),
-    [locationMessage, setLocationMessage] = useState("");
-  const [typology, setTypology] = useState<TypologyInput>({});
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    setProfile(null);
-    setDismissed(false);
-    if (!isLoaded || !isSignedIn) return;
-    let active = true;
-    getUserProfile()
-      .then((r) => {
-        if (active && r.success && r.profile) {
-          setProfile(r.profile);
-          const parts = (r.profile.location || "")
-            .split(",")
-            .map((part) => part.trim());
-          setCity(parts.length > 1 ? parts.slice(0, -1).join(", ") : "");
-          setCountry(
-            parts.length > 1 ? parts[parts.length - 1] : parts[0] || "",
-          );
-          setTypology(typologyFromProfile(r.profile));
-          setDraft({
-            username: r.profile.username || "",
-            displayName: r.profile.displayName || "",
-            dateOfBirth: r.profile.dateOfBirth
-              ? new Date(r.profile.dateOfBirth).toISOString().slice(0, 10)
-              : "",
-            bio: r.profile.bio || "",
-            location: r.profile.location || "",
-            interestCodes: r.profile.interestCodes,
-            hobbies: r.profile.hobbies || "",
-          });
-        }
-      })
-      .catch(() => {
-        if (active) setError("Chưa tải được hồ sơ.");
-      });
-    return () => {
-      active = false;
-    };
-  }, [isLoaded, isSignedIn, user?.id]);
-  const open = !!profile && !profile.onboardingCompletedAt && !dismissed;
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement;
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panel.current?.focus();
-    function trap(e: KeyboardEvent) {
-      if (e.key !== "Tab") return;
-      const items = panel.current?.querySelectorAll<HTMLElement>(
-        "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled)",
-      );
-      if (!items?.length) return;
-      const first = items[0],
-        last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener("keydown", trap);
-    return () => {
-      document.body.style.overflow = old;
-      document.removeEventListener("keydown", trap);
-      previous?.focus();
-    };
-  }, [open]);
-  if (!open || !profile || typeof document === "undefined") return null;
+  const [profile, setProfile] = useState(initialProfile);
+  const [draft, setDraft] = useState<UpdateUserProfileInput>(() => ({
+    username: initialProfile.username || "",
+    displayName: initialProfile.displayName || "",
+    dateOfBirth: initialProfile.dateOfBirth ? new Date(initialProfile.dateOfBirth).toISOString().slice(0, 10) : "",
+    bio: initialProfile.bio || "",
+    location: initialProfile.location || "",
+    interestCodes: initialProfile.interestCodes,
+    hobbies: initialProfile.hobbies || "",
+  }));
+  const parts = (initialProfile.location || "").split(",").map((part) => part.trim());
+  const [country, setCountry] = useState(parts.length > 1 ? parts[parts.length - 1] : parts[0] || "");
+  const [city, setCity] = useState(parts.length > 1 ? parts.slice(0, -1).join(", ") : "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [locationMessage, setLocationMessage] = useState("");
+  const [typology, setTypology] = useState<TypologyInput>(() => typologyFromProfile(initialProfile));
+  const heading = useRef<HTMLHeadingElement>(null);
   const step = profile.onboardingStep;
+  useEffect(() => {
+    heading.current?.focus();
+    try { sessionStorage.removeItem(onboardingPauseKey(initialProfile.clerkId)); } catch {}
+  }, [initialProfile.clerkId]);
   function change(field: keyof UpdateUserProfileInput, value: string) {
     setDraft((old) => ({ ...old, [field]: value }));
   }
@@ -124,11 +80,13 @@ export default function ProfileOnboardingModal() {
         setError(r.error || "Chưa lưu được.");
         return;
       }
-      setProfile(r.profile);
-      if (direction === "save") setDismissed(true);
-      if (r.profile.onboardingCompletedAt) {
-        router.refresh();
-        if (tests) router.push("/test");
+      if (direction === "save") {
+        try { sessionStorage.setItem(onboardingPauseKey(profile.clerkId), "1"); } catch {}
+        router.push(returnTo);
+      } else if (r.profile.onboardingCompletedAt) {
+        router.push(tests ? "/test" : returnTo);
+      } else {
+        router.push(onboardingPath(r.profile.onboardingStep, returnTo));
       }
     } catch {
       setError("Mất kết nối. Vui lòng thử lại.");
@@ -203,31 +161,34 @@ export default function ProfileOnboardingModal() {
       />
     </label>
   );
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-3">
-      <div
-        ref={panel}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="onboarding-title"
-        className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#E2D4B7] bg-[#FCFBF8] p-6 sm:p-8"
-      >
-        <p className="text-xs tracking-widest text-[#8B6B4A]">
-          MOSAIC · BƯỚC {step + 1} / 8
-        </p>
-        <h2
-          id="onboarding-title"
-          className="mt-3 font-serif text-3xl text-[#5C4326]"
-        >
-          {ONBOARDING_STEPS[step]}
-        </h2>
-        <progress
-          aria-label="Tiến độ onboarding"
-          value={step + 1}
-          max={8}
-          className="my-4 h-2 w-full accent-[#8B6B4A]"
-        />
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <Link href="/" className={styles.brand} aria-label="MOSAIC — trang chủ">MOSAIC</Link>
+        <span className={styles.headerNote}>Mảnh ghép đầu tiên của bạn</span>
+      </header>
+      <div className={styles.layout}>
+        <aside className={styles.intro} aria-label="Các bước thiết lập">
+          <p className={styles.eyebrow}>CHÀO MỪNG ĐẾN VỚI MOSAIC</p>
+          <h2 className={styles.welcome}>Bắt đầu bằng<br />câu chuyện của bạn.</h2>
+          <p className={styles.introText}>Từng mảnh ghép nhỏ sẽ tạo nên một hồ sơ rất riêng. Bạn luôn có thể chỉnh sửa sau.</p>
+          <ol className={styles.steps}>
+            {ONBOARDING_STEPS.map((label, index) => (
+              <li key={label} aria-current={index === step ? "step" : undefined} data-done={index < step}>
+                <span aria-hidden="true">{index < step ? "✓" : String(index + 1).padStart(2, "0")}</span>
+                {label}
+              </li>
+            ))}
+          </ol>
+        </aside>
+        <section className={styles.panel} aria-labelledby="onboarding-title" aria-busy={pending}>
+          <div className={styles.stepHeading}>
+            <p className={styles.eyebrow}>THIẾT LẬP HỒ SƠ</p>
+            <span>Bước {step + 1} / {ONBOARDING_STEPS.length}</span>
+          </div>
+          <progress aria-label="Tiến độ thiết lập hồ sơ" value={step + 1} max={ONBOARDING_STEPS.length} className={styles.progress} />
+          <h1 ref={heading} tabIndex={-1} id="onboarding-title" className={styles.title}>{ONBOARDING_STEPS[step]}</h1>
+          <p className={styles.description}>{descriptions[step]}</p>
         {error && (
           <p role="alert" className="my-3 text-red-700">
             {error}
@@ -239,7 +200,7 @@ export default function ProfileOnboardingModal() {
             void save("next");
           }}
         >
-          <fieldset disabled={pending} className="space-y-4">
+          <fieldset disabled={pending} className={styles.fields}>
             {step === 0 && (
               <>
                 {text("username", "Username duy nhất", "text", true)}
@@ -387,7 +348,7 @@ export default function ProfileOnboardingModal() {
                 </button>
               </>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E2D4B7] pt-5">
+            <div className={styles.actions}>
               <button
                 type="button"
                 disabled={step === 0}
@@ -397,7 +358,7 @@ export default function ProfileOnboardingModal() {
               </button>
               <button
                 type="submit"
-                className="rounded-xl bg-[#8B6B4A] px-5 py-3 text-white"
+                className={styles.next}
               >
                 {pending
                   ? "Đang lưu…"
@@ -411,14 +372,14 @@ export default function ProfileOnboardingModal() {
             <button
               type="button"
               onClick={() => void save("save")}
-              className="w-full py-2 text-sm text-[#8B6B4A]"
+              className={styles.saveLater}
             >
               Lưu tiến độ và tiếp tục sau
             </button>
           </fieldset>
         </form>
+        </section>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

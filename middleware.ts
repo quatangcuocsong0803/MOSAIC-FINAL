@@ -3,6 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const needsSession = createRouteMatcher([
   "/profile",
+  "/onboarding(.*)",
   "/profile/blocked(.*)",
   "/settings(.*)",
   "/messages(.*)",
