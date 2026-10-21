@@ -1,13 +1,11 @@
 "use server";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { ensureUser } from "@/lib/ensure-user";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export type TestVariant =
-  | "TRADITIONAL_72"
-  | "AI_ADAPTIVE"
-  | "TRADITIONAL";
+export type TestVariant = "TRADITIONAL_72" | "AI_ADAPTIVE" | "TRADITIONAL";
 
 export interface SaveTestResultInput {
   // Ví dụ: "MBTI", "ENNEAGRAM"
@@ -41,8 +39,7 @@ export interface SaveTestResultInput {
   statisticsConsent?: boolean;
 }
 
-const STATISTICS_CONSENT_VERSION =
-  "stats-consent-v1";
+const STATISTICS_CONSENT_VERSION = "stats-consent-v1";
 
 /**
  * Kiểm tra variant có phù hợp với loại test hay không.
@@ -50,19 +47,13 @@ const STATISTICS_CONSENT_VERSION =
  * Việc này diễn ra server-side để client không thể
  * tự gửi một variant tùy ý.
  */
-function isValidVariant(
-  testType: string,
-  variant: TestVariant | null
-) {
+function isValidVariant(testType: string, variant: TestVariant | null) {
   if (variant === null) {
     return true;
   }
 
   if (testType === "MBTI") {
-    return (
-      variant === "TRADITIONAL_72" ||
-      variant === "AI_ADAPTIVE"
-    );
+    return variant === "TRADITIONAL_72" || variant === "AI_ADAPTIVE";
   }
 
   if (testType === "ENNEAGRAM") {
@@ -99,43 +90,32 @@ export async function saveTestResult({
     if (!userId) {
       return {
         success: false,
-        error:
-          "Chưa đăng nhập. Kết quả chỉ lưu tạm thời.",
+        error: "Chưa đăng nhập. Kết quả chỉ lưu tạm thời.",
       };
     }
 
-    const formattedType =
-      testType.trim().toUpperCase();
+    const formattedType = testType.trim().toUpperCase();
 
-    const formattedName =
-      resultName.trim();
+    const formattedName = resultName.trim();
 
     if (!formattedType) {
       return {
         success: false,
-        error:
-          "Loại bài test không hợp lệ.",
+        error: "Loại bài test không hợp lệ.",
       };
     }
 
     if (!formattedName) {
       return {
         success: false,
-        error:
-          "Kết quả bài test không hợp lệ.",
+        error: "Kết quả bài test không hợp lệ.",
       };
     }
 
-    if (
-      !isValidVariant(
-        formattedType,
-        testVariant
-      )
-    ) {
+    if (!isValidVariant(formattedType, testVariant)) {
       return {
         success: false,
-        error:
-          "Biến thể bài test không hợp lệ.",
+        error: "Biến thể bài test không hợp lệ.",
       };
     }
 
@@ -143,38 +123,16 @@ export async function saveTestResult({
     // 1. Tìm hoặc tạo User từ Clerk
     // ========================================================
 
-    let user =
-      await prisma.user.findUnique({
-        where: {
-          clerkId: userId,
-        },
-      });
+    let user = await prisma.user.findUnique({
+      where: {
+        clerkId: userId,
+      },
+    });
 
     if (!user) {
-      const clerkUser =
-        await currentUser();
+      const clerkUser = await currentUser();
 
-      let username =
-        clerkUser?.username ||
-        [
-          clerkUser?.firstName,
-          clerkUser?.lastName,
-        ]
-          .filter(Boolean)
-          .join(" ");
-
-      if (!username) {
-        username =
-          `user_${userId.slice(-6)}`;
-      }
-
-      user =
-        await prisma.user.create({
-          data: {
-            clerkId: userId,
-            username,
-          },
-        });
+      user = await ensureUser(userId, clerkUser?.fullName);
     }
 
     // ========================================================
@@ -185,60 +143,44 @@ export async function saveTestResult({
      * Consent chỉ được ghi nhận nếu user
      * chủ động chọn đồng ý.
      */
-    const consented =
-      statisticsConsent === true;
+    const consented = statisticsConsent === true;
 
-    const consentedAt =
-      consented
-        ? new Date()
-        : null;
+    const consentedAt = consented ? new Date() : null;
 
-    const consentVersion =
-      consented
-        ? STATISTICS_CONSENT_VERSION
-        : null;
+    const consentVersion = consented ? STATISTICS_CONSENT_VERSION : null;
 
     // ========================================================
     // 3. Lưu TestResult
     // ========================================================
 
-    const testResult =
-      await prisma.testResult.create({
-        data: {
-          userId: user.id,
+    const testResult = await prisma.testResult.create({
+      data: {
+        userId: user.id,
 
-          testType:
-            formattedType,
+        testType: formattedType,
 
-          testVariant:
-            testVariant ?? null,
+        testVariant: testVariant ?? null,
 
-          resultName:
-            formattedName,
+        resultName: formattedName,
 
-          details:
-            details ??
-            `Kết quả bài test ${formattedType}: ${formattedName}`,
+        details:
+          details ?? `Kết quả bài test ${formattedType}: ${formattedName}`,
 
-          /*
-           * false vẫn lưu TestResult.
-           *
-           * Statistics chỉ được phép sử dụng
-           * profile-linked data khi consent = true.
-           */
-          statisticsConsent:
-            consented,
+        /*
+         * false vẫn lưu TestResult.
+         *
+         * Statistics chỉ được phép sử dụng
+         * profile-linked data khi consent = true.
+         */
+        statisticsConsent: consented,
 
-          statisticsConsentVersion:
-            consentVersion,
+        statisticsConsentVersion: consentVersion,
 
-          statisticsConsentedAt:
-            consentedAt,
+        statisticsConsentedAt: consentedAt,
 
-          statisticsConsentRevokedAt:
-            null,
-        },
-      });
+        statisticsConsentRevokedAt: null,
+      },
+    });
 
     // ========================================================
     // 4. Refresh các trang liên quan
@@ -252,25 +194,20 @@ export async function saveTestResult({
     return {
       success: true,
 
-      message:
-        `Đã lưu thành công kết quả bài test ${formattedName}.`,
+      message: `Đã lưu thành công kết quả bài test ${formattedName}.`,
 
-      testResultId:
-        testResult.id,
+      testResultId: testResult.id,
     };
   } catch (error) {
     console.error(
       "Lỗi khi lưu kết quả bài test:",
-      error instanceof Error
-        ? error.message
-        : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
 
     return {
       success: false,
 
-      error:
-        "Không thể lưu kết quả bài test vào cơ sở dữ liệu.",
+      error: "Không thể lưu kết quả bài test vào cơ sở dữ liệu.",
     };
   }
 }
@@ -285,9 +222,7 @@ export async function saveTestResult({
  * - KHÔNG xóa lịch sử consent trước đó
  * - Chỉ loại result khỏi Statistics từ thời điểm revoke
  */
-export async function revokeStatisticsConsent(
-  testResultId: string
-): Promise<{
+export async function revokeStatisticsConsent(testResultId: string): Promise<{
   success: boolean;
   message?: string;
   error?: string;
@@ -298,19 +233,16 @@ export async function revokeStatisticsConsent(
     if (!userId) {
       return {
         success: false,
-        error:
-          "Bạn cần đăng nhập để thay đổi quyền chia sẻ dữ liệu.",
+        error: "Bạn cần đăng nhập để thay đổi quyền chia sẻ dữ liệu.",
       };
     }
 
-    const normalizedId =
-      testResultId.trim();
+    const normalizedId = testResultId.trim();
 
     if (!normalizedId) {
       return {
         success: false,
-        error:
-          "Kết quả bài test không hợp lệ.",
+        error: "Kết quả bài test không hợp lệ.",
       };
     }
 
@@ -318,21 +250,19 @@ export async function revokeStatisticsConsent(
     // 1. Xác định user hiện tại
     // ========================================================
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          clerkId: userId,
-        },
-        select: {
-          id: true,
-        },
-      });
+    const user = await prisma.user.findUnique({
+      where: {
+        clerkId: userId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!user) {
       return {
         success: false,
-        error:
-          "Không tìm thấy hồ sơ người dùng.",
+        error: "Không tìm thấy hồ sơ người dùng.",
       };
     }
 
@@ -340,24 +270,22 @@ export async function revokeStatisticsConsent(
     // 2. Kiểm tra TestResult thuộc đúng user
     // ========================================================
 
-    const testResult =
-      await prisma.testResult.findFirst({
-        where: {
-          id: normalizedId,
-          userId: user.id,
-        },
-        select: {
-          id: true,
-          statisticsConsent: true,
-          statisticsConsentRevokedAt: true,
-        },
-      });
+    const testResult = await prisma.testResult.findFirst({
+      where: {
+        id: normalizedId,
+        userId: user.id,
+      },
+      select: {
+        id: true,
+        statisticsConsent: true,
+        statisticsConsentRevokedAt: true,
+      },
+    });
 
     if (!testResult) {
       return {
         success: false,
-        error:
-          "Không tìm thấy kết quả bài test này.",
+        error: "Không tìm thấy kết quả bài test này.",
       };
     }
 
@@ -376,13 +304,10 @@ export async function revokeStatisticsConsent(
       };
     }
 
-    if (
-      testResult.statisticsConsent === false
-    ) {
+    if (testResult.statisticsConsent === false) {
       return {
         success: true,
-        message:
-          "Kết quả này hiện không được chia sẻ cho Statistics.",
+        message: "Kết quả này hiện không được chia sẻ cho Statistics.",
       };
     }
 
@@ -403,11 +328,9 @@ export async function revokeStatisticsConsent(
          * Hai field đó giữ lại lịch sử:
          * user từng đồng ý lúc nào / version nào.
          */
-        statisticsConsent:
-          false,
+        statisticsConsent: false,
 
-        statisticsConsentRevokedAt:
-          new Date(),
+        statisticsConsentRevokedAt: new Date(),
       },
     });
 
@@ -429,16 +352,13 @@ export async function revokeStatisticsConsent(
   } catch (error) {
     console.error(
       "Lỗi khi thu hồi Statistics consent:",
-      error instanceof Error
-        ? error.message
-        : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
 
     return {
       success: false,
 
-      error:
-        "Không thể thu hồi quyền chia sẻ Statistics lúc này.",
+      error: "Không thể thu hồi quyền chia sẻ Statistics lúc này.",
     };
   }
 }

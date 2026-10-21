@@ -1,0 +1,113 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 100dvh;
+  padding: 0 5vw 84px;
+  color: var(--text-primary);
+  background-color: #f5edda;
+  background-image: url("/onboarding/background-tile.jpeg");
+  background-repeat: repeat;
+  /* Original 736 × 736 px tile: never cover/stretch the uploaded wallpaper. */
+  background-size: 736px 736px;
+  background-position: center top;
+}
+.header {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid rgba(139,107,74,.25);
+}
+.brand { padding: 6px 12px; background: rgba(255,248,226,.84); border-radius: 8px; font-family: var(--font-serif); font-size: 24px; letter-spacing: .18em; }
+.headerNote { padding: 6px 10px; border-radius: 8px; background: rgba(255,248,226,.84); font-size: 13px; color: var(--text-muted); }
+.layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 620px);
+  align-items: start;
+  gap: clamp(20px, 4vw, 56px);
+  max-width: 1120px;
+  margin: 76px auto 0;
+  padding: clamp(36px, 4.5vw, 64px);
+  border: 4px double #c9b99a;
+  border-radius: 5px;
+  background: rgba(255, 248, 224, .91);
+  box-shadow: 0 12px 48px rgba(92,67,38,.13), inset 0 0 0 7px rgba(255,251,237,.5);
+  backdrop-filter: blur(2px);
+}
+.intro { padding: 24px 0; min-width: 0; }
+.eyebrow { color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .16em; }
+.welcome { margin-top: 20px; font-family: var(--font-serif); font-size: clamp(30px, 3.3vw, 44px); line-height: 1.3; }
+.introText { max-width: 320px; margin-top: 18px; font-size: 14px; line-height: 1.8; color: var(--text-muted); }
+.steps { display: grid; gap: 12px; margin-top: 36px; list-style: none; }
+.steps li { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 14px; }
+.steps li > span { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border-light); border-radius: 50%; font-size: 11px; }
+.steps li[aria-current] { color: var(--text-primary); font-weight: 600; }
+.steps li[aria-current] > span { color: #fff; background: #8b6b4a; border-color: #8b6b4a; }
+.steps li[data-done="true"] > span { background: #ede7dc; color: #5c4326; }
+.panel { min-width: 0; padding: 24px 0 24px clamp(20px, 3vw, 40px); border-left: 1px solid rgba(139,107,74,.22); }
+.stepHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stepHeading > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.progress { display: block; width: 100%; height: 5px; margin: 18px 0 30px; border: none; border-radius: 8px; overflow: hidden; accent-color: #8b6b4a; background: #eee8dc; }
+.progress::-webkit-progress-bar { background: #eee8dc; }
+.progress::-webkit-progress-value { background: #8b6b4a; }
+.progress::-moz-progress-bar { background: #8b6b4a; }
+.title { font-family: var(--font-serif); font-size: clamp(28px, 3vw, 38px); line-height: 1.3; outline: none; }
+.description { margin: 12px 0 28px; color: var(--text-muted); font-size: 14px; line-height: 1.8; }
+.fields { min-width: 0; border: 0; display: flex; flex-direction: column; gap: 18px; }
+.fields input, .fields select, .fields textarea { max-width: 100%; }
+.fields input:focus-visible, .fields select:focus-visible, .fields textarea:focus-visible { outline: 2px solid #8b6b4a; outline-offset: 3px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--border-light); padding-top: 24px; margin-top: 12px; }
+.actions button { min-height: 48px; cursor: pointer; }
+.actions button:disabled { opacity: .45; cursor: default; }
+.next { background: #8b6b4a; border: 1px solid #8b6b4a; color: white; border-radius: 12px; padding: 12px 22px; }
+.next:hover { background: #5c4326; }
+.saveLater { width: 100%; min-height: 44px; color: var(--text-muted); font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+@media (max-width: 760px) {
+  .page { padding: 0 18px 64px; }
+  .header { min-height: 72px; }
+  .headerNote { max-width: 145px; text-align: right; font-size: 11px; }
+  .layout { grid-template-columns: minmax(0, 1fr); margin-top: 60px; padding: 48px 22px 34px; gap: 0; }
+  .intro { display: none; }
+  .panel { padding: 0; border: 0; }
+  .actions { gap: 10px; }
+  .next { padding: 12px 16px; }
+}
+
+
+/* Uploaded decorations are visual only: they never intercept input or focus. */
+.scene { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; user-select: none; }
+.sticker { position: absolute; width: clamp(100px, 13vw, 190px); height: auto; max-height: 260px; object-fit: contain; opacity: .92; }
+.sticker1 { top: 132px; left: -20px; transform: rotate(-9deg); }
+.sticker2 { top: 420px; right: -18px; transform: rotate(7deg); }
+.sticker3 { bottom: 4px; left: 5%; width: clamp(100px, 12vw, 170px); transform: rotate(-5deg); }
+.frameOrnaments { position: absolute; inset: 0; z-index: 2; pointer-events: none; user-select: none; }
+.frameCorner { position: absolute; width: clamp(76px, 10vw, 128px); height: auto; }
+.bottomLeft { left: -8px; bottom: -8px; }
+.bottomRight { right: -8px; bottom: -8px; transform: scaleX(-1); }
+.topLeft { left: -8px; top: -8px; transform: scaleY(-1); }
+.topRight { right: -8px; top: -8px; transform: scale(-1, -1); }
+/* This artwork has transparent margins. Crop the presentation window with CSS,
+   preserving the source image and its proportions. */
+.crestWindow { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); width: 270px; height: 76px; overflow: hidden; }
+.crest { position: absolute; top: -42.6px; left: 0; width: 270px; height: auto; }
+@media (max-width: 760px) {
+  .frameCorner { width: 78px; }
+  .crestWindow { width: 204px; height: 58px; top: -30px; }
+  .crest { width: 204px; top: -32.2px; }
+  .sticker { width: 100px; max-height: 138px; }
+  .sticker1 { top: 76px; left: -8px; }
+  .sticker2 { top: auto; bottom: 0; right: 0; }
+  .sticker3 { display: none; }
+  .headerNote { max-width: 145px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .layout { background: #fff8e0; backdrop-filter: none; }
+}

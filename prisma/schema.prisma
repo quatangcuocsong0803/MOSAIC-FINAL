@@ -12,11 +12,36 @@ datasource db {
 // USER
 // ============================================================
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
 model User {
   id        String   @id @default(cuid())
+  mid       Int      @unique @default(autoincrement())
   clerkId   String   @unique
   username  String?  @unique
   createdAt DateTime @default(now())
+
+  socionicsType String?
+  attitudinalPsyche String?
+  instinctStack String?
+  moralAlignment String?
+  temperament String?
+  sloanType String?
+  displayName String?
+  interestCodes String[] @default([])
+  usernameVisibility ProfileVisibility @default(PUBLIC)
+  displayNameVisibility ProfileVisibility @default(PUBLIC)
+  avatarUrlVisibility ProfileVisibility @default(PUBLIC)
+  dateOfBirthVisibility ProfileVisibility @default(PRIVATE)
+  bioVisibility ProfileVisibility @default(PUBLIC)
+  hobbiesVisibility ProfileVisibility @default(PUBLIC)
+  locationVisibility ProfileVisibility @default(PRIVATE)
+  onboardingStep Int @default(0)
+  onboardingCompletedAt DateTime?
 
   // Thông tin profile
   dateOfBirth DateTime?
@@ -76,6 +101,8 @@ model User {
   // Discussion groups
   discussionGroupsCreated DiscussionGroup[]       @relation("DiscussionGroupCreator")
   discussionGroupMembers  DiscussionGroupMember[]
+
+  @@index([interestCodes], type: Gin)
 }
 
 // ============================================================

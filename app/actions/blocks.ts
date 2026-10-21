@@ -1,4 +1,5 @@
 "use server";
+import { identitySelect, visibleIdentity } from "@/lib/profile-identity";
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
@@ -22,12 +23,9 @@ async function getCurrentUser() {
   });
 }
 
-export async function blockUser(
-  targetUserId: string,
-) {
+export async function blockUser(targetUserId: string) {
   try {
-    const currentUser =
-      await getCurrentUser();
+    const currentUser = await getCurrentUser();
 
     if (!currentUser) {
       return {
@@ -36,25 +34,21 @@ export async function blockUser(
       };
     }
 
-    if (
-      !targetUserId ||
-      targetUserId === currentUser.id
-    ) {
+    if (!targetUserId || targetUserId === currentUser.id) {
       return {
         success: false as const,
         reason: "INVALID_TARGET" as const,
       };
     }
 
-    const targetExists =
-      await prisma.user.findUnique({
-        where: {
-          id: targetUserId,
-        },
-        select: {
-          id: true,
-        },
-      });
+    const targetExists = await prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!targetExists) {
       return {
@@ -63,30 +57,26 @@ export async function blockUser(
       };
     }
 
-    const friendships =
-      await prisma.friendship.findMany({
-        where: {
-          OR: [
-            {
-              senderId: currentUser.id,
-              receiverId: targetUserId,
-            },
-            {
-              senderId: targetUserId,
-              receiverId: currentUser.id,
-            },
-          ],
-        },
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [
+          {
+            senderId: currentUser.id,
+            receiverId: targetUserId,
+          },
+          {
+            senderId: targetUserId,
+            receiverId: currentUser.id,
+          },
+        ],
+      },
 
-        select: {
-          id: true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
-    const friendshipIds =
-      friendships.map(
-        (friendship) => friendship.id,
-      );
+    const friendshipIds = friendships.map((friendship) => friendship.id);
 
     await prisma.$transaction(async (tx) => {
       await tx.userBlock.upsert({
@@ -137,18 +127,13 @@ export async function blockUser(
     revalidatePath("/discover");
     revalidatePath("/messages");
     revalidatePath("/profile");
-    revalidatePath(
-      `/profile/${targetUserId}`,
-    );
+    revalidatePath(`/profile/${targetUserId}`);
 
     return {
       success: true as const,
     };
   } catch (error) {
-    console.error(
-      "Lỗi blockUser:",
-      error,
-    );
+    console.error("Lỗi blockUser:", error);
 
     return {
       success: false as const,
@@ -157,12 +142,9 @@ export async function blockUser(
   }
 }
 
-export async function unblockUser(
-  targetUserId: string,
-) {
+export async function unblockUser(targetUserId: string) {
   try {
-    const currentUser =
-      await getCurrentUser();
+    const currentUser = await getCurrentUser();
 
     if (!currentUser) {
       return {
@@ -186,10 +168,7 @@ export async function unblockUser(
       success: true as const,
     };
   } catch (error) {
-    console.error(
-      "Lỗi unblockUser:",
-      error,
-    );
+    console.error("Lỗi unblockUser:", error);
 
     return {
       success: false as const,
@@ -200,8 +179,7 @@ export async function unblockUser(
 
 export async function getBlockedUsers() {
   try {
-    const currentUser =
-      await getCurrentUser();
+    const currentUser = await getCurrentUser();
 
     if (!currentUser) {
       return {
@@ -211,43 +189,37 @@ export async function getBlockedUsers() {
       };
     }
 
-    const blocks =
-      await prisma.userBlock.findMany({
-        where: {
-          blockerId: currentUser.id,
-        },
+    const blocks = await prisma.userBlock.findMany({
+      where: {
+        blockerId: currentUser.id,
+      },
 
-        orderBy: {
-          createdAt: "desc",
-        },
+      orderBy: {
+        createdAt: "desc",
+      },
 
-        select: {
-          id: true,
-          createdAt: true,
+      select: {
+        id: true,
+        createdAt: true,
 
-          blocked: {
-            select: {
-              id: true,
-              username: true,
-              avatarUrl: true,
-            },
+        blocked: {
+          select: {
+            ...identitySelect,
           },
         },
-      });
+      },
+    });
 
     return {
       success: true as const,
 
       users: blocks.map((block) => ({
-        ...block.blocked,
+        ...visibleIdentity(block.blocked),
         blockedAt: block.createdAt,
       })),
     };
   } catch (error) {
-    console.error(
-      "Lỗi getBlockedUsers:",
-      error,
-    );
+    console.error("Lỗi getBlockedUsers:", error);
 
     return {
       success: false as const,

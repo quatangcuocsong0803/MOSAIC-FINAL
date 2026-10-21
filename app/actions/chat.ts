@@ -1,4 +1,5 @@
 "use server";
+import { identitySelect, visibleIdentity } from "@/lib/profile-identity";
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
@@ -29,10 +30,7 @@ async function getCurrentDbUser() {
   });
 }
 
-async function areFriends(
-  userAId: string,
-  userBId: string,
-) {
+async function areFriends(userAId: string, userBId: string) {
   const friendship = await prisma.friendship.findFirst({
     where: {
       status: "ACCEPTED",
@@ -55,26 +53,17 @@ async function areFriends(
   return Boolean(friendship);
 }
 
-function canonicalParticipants(
-  userAId: string,
-  userBId: string,
-) {
-  return [userAId, userBId].sort() as [
-    string,
-    string,
-  ];
+function canonicalParticipants(userAId: string, userBId: string) {
+  return [userAId, userBId].sort() as [string, string];
 }
 
 // ============================================================
 // OPEN / CREATE CONVERSATION
 // ============================================================
 
-export async function getOrCreateConversation(
-  targetUserId: string,
-) {
+export async function getOrCreateConversation(targetUserId: string) {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -83,25 +72,21 @@ export async function getOrCreateConversation(
       };
     }
 
-    if (
-      !targetUserId ||
-      currentUser.id === targetUserId
-    ) {
+    if (!targetUserId || currentUser.id === targetUserId) {
       return {
         success: false as const,
         reason: "INVALID_TARGET" as const,
       };
     }
 
-    const targetUser =
-      await prisma.user.findUnique({
-        where: {
-          id: targetUserId,
-        },
-        select: {
-          id: true,
-        },
-      });
+    const targetUser = await prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!targetUser) {
       return {
@@ -110,23 +95,14 @@ export async function getOrCreateConversation(
       };
     }
 
-    if (
-      await isBlockedBetween(
-        currentUser.id,
-        targetUserId,
-      )
-    ) {
+    if (await isBlockedBetween(currentUser.id, targetUserId)) {
       return {
         success: false as const,
         reason: "NOT_FRIENDS" as const,
       };
     }
 
-    const friendshipAccepted =
-      await areFriends(
-        currentUser.id,
-        targetUserId,
-      );
+    const friendshipAccepted = await areFriends(currentUser.id, targetUserId);
 
     if (!friendshipAccepted) {
       return {
@@ -135,44 +111,37 @@ export async function getOrCreateConversation(
       };
     }
 
-    const [
-      participantAId,
-      participantBId,
-    ] = canonicalParticipants(
+    const [participantAId, participantBId] = canonicalParticipants(
       currentUser.id,
       targetUserId,
     );
 
-    const conversation =
-      await prisma.conversation.upsert({
-        where: {
-          participantAId_participantBId: {
-            participantAId,
-            participantBId,
-          },
-        },
-
-        update: {},
-
-        create: {
+    const conversation = await prisma.conversation.upsert({
+      where: {
+        participantAId_participantBId: {
           participantAId,
           participantBId,
         },
+      },
 
-        select: {
-          id: true,
-        },
-      });
+      update: {},
+
+      create: {
+        participantAId,
+        participantBId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
 
     return {
       success: true as const,
       conversationId: conversation.id,
     };
   } catch (error) {
-    console.error(
-      "Lỗi getOrCreateConversation:",
-      error,
-    );
+    console.error("Lỗi getOrCreateConversation:", error);
 
     return {
       success: false as const,
@@ -185,12 +154,9 @@ export async function getOrCreateConversation(
 // GET CONVERSATION + MESSAGES
 // ============================================================
 
-export async function getConversation(
-  conversationId: string,
-) {
+export async function getConversation(conversationId: string) {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -199,64 +165,56 @@ export async function getConversation(
       };
     }
 
-    const conversation =
-      await prisma.conversation.findUnique({
-        where: {
-          id: conversationId,
-        },
+    const conversation = await prisma.conversation.findUnique({
+      where: {
+        id: conversationId,
+      },
 
-        select: {
-          id: true,
-          participantAId: true,
-          participantBId: true,
+      select: {
+        id: true,
+        participantAId: true,
+        participantBId: true,
 
-          participantA: {
-            select: {
-              id: true,
-              username: true,
-              avatarUrl: true,
-            },
-          },
-
-          participantB: {
-            select: {
-              id: true,
-              username: true,
-              avatarUrl: true,
-            },
-          },
-
-          messages: {
-            orderBy: {
-              createdAt: "desc",
-            },
-
-            take: 100,
-
-            select: {
-              id: true,
-              senderId: true,
-              content: true,
-              createdAt: true,
-              readAt: true,
-            },
+        participantA: {
+          select: {
+            ...identitySelect,
           },
         },
-      });
+
+        participantB: {
+          select: {
+            ...identitySelect,
+          },
+        },
+
+        messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+
+          take: 100,
+
+          select: {
+            id: true,
+            senderId: true,
+            content: true,
+            createdAt: true,
+            readAt: true,
+          },
+        },
+      },
+    });
 
     if (!conversation) {
       return {
         success: false as const,
-        reason:
-          "CONVERSATION_NOT_FOUND" as const,
+        reason: "CONVERSATION_NOT_FOUND" as const,
       };
     }
 
     const isParticipant =
-      conversation.participantAId ===
-        currentUser.id ||
-      conversation.participantBId ===
-        currentUser.id;
+      conversation.participantAId === currentUser.id ||
+      conversation.participantBId === currentUser.id;
 
     if (!isParticipant) {
       return {
@@ -266,31 +224,21 @@ export async function getConversation(
     }
 
     const otherUser =
-      conversation.participantAId ===
-      currentUser.id
+      conversation.participantAId === currentUser.id
         ? conversation.participantB
         : conversation.participantA;
 
     // Quan trọng:
     // Conversation từng tồn tại không có nghĩa là
     // sau khi unfriend vẫn được đọc lịch sử chat.
-    if (
-      await isBlockedBetween(
-        currentUser.id,
-        otherUser.id,
-      )
-    ) {
+    if (await isBlockedBetween(currentUser.id, otherUser.id)) {
       return {
         success: false as const,
         reason: "NOT_FRIENDS" as const,
       };
     }
 
-    const friendshipAccepted =
-      await areFriends(
-        currentUser.id,
-        otherUser.id,
-      );
+    const friendshipAccepted = await areFriends(currentUser.id, otherUser.id);
 
     if (!friendshipAccepted) {
       return {
@@ -302,8 +250,7 @@ export async function getConversation(
     // Đánh dấu message của đối phương là đã đọc.
     await prisma.message.updateMany({
       where: {
-        conversationId:
-          conversation.id,
+        conversationId: conversation.id,
 
         senderId: {
           not: currentUser.id,
@@ -323,17 +270,13 @@ export async function getConversation(
       conversation: {
         id: conversation.id,
 
-        otherUser,
+        otherUser: visibleIdentity(otherUser, false, true),
 
-        messages:
-          conversation.messages.reverse(),
+        messages: conversation.messages.reverse(),
       },
     };
   } catch (error) {
-    console.error(
-      "Lỗi getConversation:",
-      error,
-    );
+    console.error("Lỗi getConversation:", error);
 
     return {
       success: false as const,
@@ -346,13 +289,9 @@ export async function getConversation(
 // SEND MESSAGE
 // ============================================================
 
-export async function sendMessage(
-  conversationId: string,
-  rawContent: string,
-) {
+export async function sendMessage(conversationId: string, rawContent: string) {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -377,32 +316,28 @@ export async function sendMessage(
       };
     }
 
-    const conversation =
-      await prisma.conversation.findUnique({
-        where: {
-          id: conversationId,
-        },
+    const conversation = await prisma.conversation.findUnique({
+      where: {
+        id: conversationId,
+      },
 
-        select: {
-          id: true,
-          participantAId: true,
-          participantBId: true,
-        },
-      });
+      select: {
+        id: true,
+        participantAId: true,
+        participantBId: true,
+      },
+    });
 
     if (!conversation) {
       return {
         success: false as const,
-        reason:
-          "CONVERSATION_NOT_FOUND" as const,
+        reason: "CONVERSATION_NOT_FOUND" as const,
       };
     }
 
     const isParticipant =
-      conversation.participantAId ===
-        currentUser.id ||
-      conversation.participantBId ===
-        currentUser.id;
+      conversation.participantAId === currentUser.id ||
+      conversation.participantBId === currentUser.id;
 
     if (!isParticipant) {
       return {
@@ -412,28 +347,18 @@ export async function sendMessage(
     }
 
     const otherUserId =
-      conversation.participantAId ===
-      currentUser.id
+      conversation.participantAId === currentUser.id
         ? conversation.participantBId
         : conversation.participantAId;
 
-    if (
-      await isBlockedBetween(
-        currentUser.id,
-        otherUserId,
-      )
-    ) {
+    if (await isBlockedBetween(currentUser.id, otherUserId)) {
       return {
         success: false as const,
         reason: "NOT_FRIENDS" as const,
       };
     }
 
-    const friendshipAccepted =
-      await areFriends(
-        currentUser.id,
-        otherUserId,
-      );
+    const friendshipAccepted = await areFriends(currentUser.id, otherUserId);
 
     if (!friendshipAccepted) {
       return {
@@ -442,46 +367,41 @@ export async function sendMessage(
       };
     }
 
-    const [message] =
-      await prisma.$transaction([
-        prisma.message.create({
-          data: {
-            conversationId:
-              conversation.id,
+    const [message] = await prisma.$transaction([
+      prisma.message.create({
+        data: {
+          conversationId: conversation.id,
 
-            senderId:
-              currentUser.id,
+          senderId: currentUser.id,
 
-            content,
-          },
+          content,
+        },
 
-          select: {
-            id: true,
-            senderId: true,
-            content: true,
-            createdAt: true,
-            readAt: true,
-          },
-        }),
+        select: {
+          id: true,
+          senderId: true,
+          content: true,
+          createdAt: true,
+          readAt: true,
+        },
+      }),
 
-        prisma.conversation.update({
-          where: {
-            id: conversation.id,
-          },
+      prisma.conversation.update({
+        where: {
+          id: conversation.id,
+        },
 
-          data: {
-            updatedAt: new Date(),
-          },
+        data: {
+          updatedAt: new Date(),
+        },
 
-          select: {
-            id: true,
-          },
-        }),
-      ]);
+        select: {
+          id: true,
+        },
+      }),
+    ]);
 
-    revalidatePath(
-      `/messages/${conversation.id}`,
-    );
+    revalidatePath(`/messages/${conversation.id}`);
 
     revalidatePath("/messages");
 
@@ -490,10 +410,7 @@ export async function sendMessage(
       message,
     };
   } catch (error) {
-    console.error(
-      "Lỗi sendMessage:",
-      error,
-    );
+    console.error("Lỗi sendMessage:", error);
 
     return {
       success: false as const,
@@ -508,8 +425,7 @@ export async function sendMessage(
 
 export async function getConversations() {
   try {
-    const currentUser =
-      await getCurrentDbUser();
+    const currentUser = await getCurrentDbUser();
 
     if (!currentUser) {
       return {
@@ -519,36 +435,31 @@ export async function getConversations() {
       };
     }
 
-    const friendships =
-      await prisma.friendship.findMany({
-        where: {
-          status: "ACCEPTED",
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        status: "ACCEPTED",
 
-          OR: [
-            {
-              senderId:
-                currentUser.id,
-            },
-            {
-              receiverId:
-                currentUser.id,
-            },
-          ],
-        },
+        OR: [
+          {
+            senderId: currentUser.id,
+          },
+          {
+            receiverId: currentUser.id,
+          },
+        ],
+      },
 
-        select: {
-          senderId: true,
-          receiverId: true,
-        },
-      });
+      select: {
+        senderId: true,
+        receiverId: true,
+      },
+    });
 
-    const friendIds =
-      friendships.map((friendship) =>
-        friendship.senderId ===
-        currentUser.id
-          ? friendship.receiverId
-          : friendship.senderId,
-      );
+    const friendIds = friendships.map((friendship) =>
+      friendship.senderId === currentUser.id
+        ? friendship.receiverId
+        : friendship.senderId,
+    );
 
     if (friendIds.length === 0) {
       return {
@@ -557,87 +468,76 @@ export async function getConversations() {
       };
     }
 
-    const conversations =
-      await prisma.conversation.findMany({
-        where: {
-          OR: [
-            {
-              participantAId:
-                currentUser.id,
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        OR: [
+          {
+            participantAId: currentUser.id,
 
-              participantBId: {
-                in: friendIds,
-              },
-            },
-
-            {
-              participantBId:
-                currentUser.id,
-
-              participantAId: {
-                in: friendIds,
-              },
-            },
-          ],
-        },
-
-        orderBy: {
-          updatedAt: "desc",
-        },
-
-        select: {
-          id: true,
-          participantAId: true,
-          participantBId: true,
-          updatedAt: true,
-
-          participantA: {
-            select: {
-              id: true,
-              username: true,
-              avatarUrl: true,
+            participantBId: {
+              in: friendIds,
             },
           },
 
-          participantB: {
-            select: {
-              id: true,
-              username: true,
-              avatarUrl: true,
+          {
+            participantBId: currentUser.id,
+
+            participantAId: {
+              in: friendIds,
             },
           },
+        ],
+      },
 
-          messages: {
-            orderBy: {
-              createdAt: "desc",
-            },
+      orderBy: {
+        updatedAt: "desc",
+      },
 
-            take: 1,
+      select: {
+        id: true,
+        participantAId: true,
+        participantBId: true,
+        updatedAt: true,
 
-            select: {
-              id: true,
-              senderId: true,
-              content: true,
-              createdAt: true,
-              readAt: true,
-            },
+        participantA: {
+          select: {
+            ...identitySelect,
           },
         },
-      });
 
-    const conversationIds =
-      conversations.map(
-        (conversation) =>
-          conversation.id,
-      );
+        participantB: {
+          select: {
+            ...identitySelect,
+          },
+        },
+
+        messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+
+          take: 1,
+
+          select: {
+            id: true,
+            senderId: true,
+            content: true,
+            createdAt: true,
+            readAt: true,
+          },
+        },
+      },
+    });
+
+    const conversationIds = conversations.map(
+      (conversation) => conversation.id,
+    );
 
     const unreadGroups =
       conversationIds.length === 0
         ? []
         : await prisma.message.groupBy({
-            by: [
-              "conversationId",
-            ],
+            by: ["conversationId"],
 
             where: {
               conversationId: {
@@ -656,51 +556,32 @@ export async function getConversations() {
             },
           });
 
-    const unreadCountByConversation =
-      new Map(
-        unreadGroups.map(
-          (group) => [
-            group.conversationId,
-            group._count._all,
-          ],
-        ),
-      );
+    const unreadCountByConversation = new Map(
+      unreadGroups.map((group) => [group.conversationId, group._count._all]),
+    );
 
     return {
       success: true as const,
 
-      conversations:
-        conversations.map(
-          (conversation) => {
-            const otherUser =
-              conversation.participantAId ===
-              currentUser.id
-                ? conversation.participantB
-                : conversation.participantA;
+      conversations: conversations.map((conversation) => {
+        const otherUser =
+          conversation.participantAId === currentUser.id
+            ? conversation.participantB
+            : conversation.participantA;
 
-            return {
-              id: conversation.id,
-              otherUser,
-              updatedAt:
-                conversation.updatedAt,
+        return {
+          id: conversation.id,
+          otherUser: visibleIdentity(otherUser, false, true),
+          updatedAt: conversation.updatedAt,
 
-              unreadCount:
-                unreadCountByConversation.get(
-                  conversation.id,
-                ) ?? 0,
+          unreadCount: unreadCountByConversation.get(conversation.id) ?? 0,
 
-              lastMessage:
-                conversation.messages[0] ??
-                null,
-            };
-          },
-        ),
+          lastMessage: conversation.messages[0] ?? null,
+        };
+      }),
     };
   } catch (error) {
-    console.error(
-      "Lỗi getConversations:",
-      error,
-    );
+    console.error("Lỗi getConversations:", error);
 
     return {
       success: false as const,
