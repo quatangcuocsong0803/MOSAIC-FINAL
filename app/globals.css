@@ -483,11 +483,14 @@ html[data-reduced-motion="true"] a:hover, html[data-reduced-motion="true"] artic
 
 /* Shared tiled canvases: intrinsic/downscaled tiles, never stretched to cover. */
 .mosaic-feature-canvas {width:100%;min-height:calc(100vh - 70px);padding:36px clamp(12px,3vw,44px) 64px;--mosaic-paper:rgba(248,245,238,.70);background:#e9dfcd url('/home/background-tile.jpg') left top / 1024px 768px repeat;color:#5c4326;}
-.mosaic-feature-paper {width:100%;max-width:1440px;margin:0 auto;border:1px solid #bba16c;border-radius:22px;background:var(--mosaic-paper);box-shadow:0 12px 40px #4d3b2414;min-height:70vh;overflow:clip;}
+.mosaic-feature-paper {width:100%;max-width:1248px;margin:0 auto;border:1px solid rgba(179,154,101,.35);border-radius:22px;background:var(--mosaic-paper);box-shadow:0 12px 40px #4d3b2414;overflow:clip;}
+.mosaic-feature-paper .mosaic-page-transition {display:flow-root;}
+.mosaic-feature-canvas[data-paper-width="test"] .mosaic-feature-paper {max-width:1024px;}
+.mosaic-feature-canvas[data-paper-width="exhibition"] .mosaic-feature-paper {max-width:1024px;}
+.mosaic-knowledge-canvas {--mosaic-paper:rgba(248,245,238,.88);}
 .mosaic-feature-content {width:100%;max-width:1440px;margin:0 auto;}
-.mosaic-feature-paper > main,.mosaic-feature-paper > section,.mosaic-feature-paper > div {background-color:transparent;}
 .mosaic-editorial-canvas {background-image:url('/home/editorial-floral-tile.jpg');background-size:713.5px 551px;}
-.mosaic-editorial-canvas .mosaic-feature-content > [class*="LongformPage_page"] {background:none;}
+.mosaic-editorial-canvas .mosaic-editorial-page {background:none;padding:0;min-height:0;}
 .mosaic-profile-card {width:100%;max-width:none;border:1px solid #cfb77e;border-radius:20px;background:var(--mosaic-paper,rgba(248,245,238,.70));padding:24px;box-shadow:0 4px 18px #5c43260c;color:#5c4326;}
 .mosaic-button {border:1px solid #795737;border-radius:12px;background:#805d3b;color:#fffaf0;padding:10px 18px;font-weight:600;cursor:pointer;transition:background .15s;}
 .mosaic-button:hover {background:#67482e;}

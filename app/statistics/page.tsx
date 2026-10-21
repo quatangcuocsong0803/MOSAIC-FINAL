@@ -13,7 +13,8 @@ export default async function StatisticsPage() {
   const confirmed = await getConfirmedIdentityStatistics();
   return (
     <>
-      <section className="mosaic-profile-card mx-auto my-8 w-[min(1100px,92vw)]">
+      <div className="mx-auto max-w-[1180px] px-6 pt-8 max-sm:px-4">
+      <section className="mosaic-profile-card">
         <h2 className="font-serif text-3xl">Kết quả đã xác nhận</h2>
         <p className="my-3 text-sm">
           Dữ liệu người dùng xác nhận trên hồ sơ và đồng ý chia sẻ riêng. Mỗi
@@ -47,6 +48,7 @@ export default async function StatisticsPage() {
           ))}
         </div>
       </section>
+      </div>
       <StatisticsDashboard stats={await getStatisticsData()} />
       <MapShortcut />
     </>
