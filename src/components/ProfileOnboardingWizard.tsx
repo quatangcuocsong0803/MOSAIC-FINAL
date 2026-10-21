@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./ProfileOnboardingWizard.module.css";
+import { OnboardingFrameOrnaments, OnboardingSceneDecorations } from "./OnboardingDecorations";
 import { useRouter } from "next/navigation";
 import InterestPicker from "@/src/components/InterestPicker";
 import TypologyFields from "@/src/components/TypologyFields";
@@ -163,11 +164,13 @@ export default function ProfileOnboardingWizard({ initialProfile, returnTo = "/p
   );
   return (
     <div className={styles.page}>
+      <OnboardingSceneDecorations step={step} />
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="MOSAIC — trang chủ">MOSAIC</Link>
         <span className={styles.headerNote}>Mảnh ghép đầu tiên của bạn</span>
       </header>
       <div className={styles.layout}>
+        <OnboardingFrameOrnaments />
         <aside className={styles.intro} aria-label="Các bước thiết lập">
           <p className={styles.eyebrow}>CHÀO MỪNG ĐẾN VỚI MOSAIC</p>
           <h2 className={styles.welcome}>Bắt đầu bằng<br />câu chuyện của bạn.</h2>

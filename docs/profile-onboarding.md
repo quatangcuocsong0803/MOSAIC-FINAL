@@ -130,3 +130,40 @@ Validation for this update: 96 ordinary tests pass; the eight disposable-Postgre
 tests remain skipped without a test database. Typecheck and production build pass;
 lint has zero errors and nine existing-category warnings. Live Clerk sign-up and
 remote uploads still require a Preview check.
+
+
+## Rococo onboarding artwork
+
+The onboarding-only background uses the supplied floral JPEG as a repeating
+736 × 736 px tile. It is never scaled to cover the viewport. The entire form and
+desktop progress sidebar sit inside a lightly translucent cream-yellow frame.
+The supplied bottom-left corner ornament is mirrored with CSS for the other
+three corners; the supplied crest is centered across the top edge on every step.
+All artwork is decorative, hidden from assistive technology, and ignores pointer
+input. Three accents are selected per step (two visible on small screens).
+
+Assets in `public/onboarding` are WebP encodings of the user-supplied PNGs,
+retaining the original dimensions and alpha channel; the background JPEG is
+copied unchanged. Original names and the asset mapping are recorded below:
+
+| Asset | Supplied item |
+| --- | --- |
+| frame-corner | góc khung .png |
+| frame-crest | đỉnh khung.png |
+| flower-vase | bình hoa.png |
+| cherubs | thiên thần.png |
+| fan | quạt rococo.png |
+| floral-house | nhà hoa.png |
+| flying-figure-1 | người bay 1.png |
+| flying-figure-2 | người bay 2.png |
+| chandelier | đèn chùm.png |
+| peacock | con công.png |
+| ornate-vase | cốc thần rooco.png |
+| rococo-cup | cốc rococo.png |
+| bouquet | bó hoa.png |
+| dove | bồ câu 1.png |
+
+The eight scenes are defined in `OnboardingDecorations.tsx`. Browser layout checks
+use the real wizard with mocked routing/actions, not a real Clerk session. The
+1440 px desktop and 390 px mobile renders load all displayed artwork and have no
+horizontal overflow. No new database migration or production deployment is needed.
