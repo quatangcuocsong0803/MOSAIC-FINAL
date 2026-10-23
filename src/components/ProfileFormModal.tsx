@@ -17,6 +17,8 @@ import {
   type ProfileField,
 } from "@/lib/profile-policy";
 import { notifyAvatarUpdated } from "@/lib/avatar-events";
+import { prepareAvatar } from '@/lib/avatar/prepare';
+import { uploadResponse } from '@/lib/upload-response';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -149,12 +151,12 @@ export default function ProfileFormModal({
     setError("");
     try {
       const body = new FormData();
-      body.set("avatar", file);
+      body.set("avatar", await prepareAvatar(file));
       const response = await fetch("/api/profile/avatar", {
         method: "POST",
         body,
       });
-      const r = await response.json();
+      const r = await uploadResponse<{ error?: string; avatarUrl: string }>(response);
       if (!response.ok) throw Error(r.error);
       setProfile((p) => (p ? { ...p, avatarUrl: r.avatarUrl } : p));
       notifyAvatarUpdated(r.avatarUrl);

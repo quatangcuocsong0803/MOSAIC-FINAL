@@ -60,7 +60,7 @@ export default async function FriendProfilePage({
   const avatarLetter = (displayName.trim()[0] || "M").toUpperCase();
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-10 md:py-14">
+    <main className="mosaic-profile-page mx-auto w-full max-w-4xl px-4 py-10 md:py-14">
       <div className="overflow-hidden rounded-3xl border border-[#E2D4B7] bg-white shadow-sm">
         {profile.coverUrl && (
           <img

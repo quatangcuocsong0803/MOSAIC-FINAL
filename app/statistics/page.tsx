@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 export default async function StatisticsPage() {
-  const confirmed = await getConfirmedIdentityStatistics();
+  const [confirmed, statistics] = await Promise.all([getConfirmedIdentityStatistics(), getStatisticsData()]);
   return (
     <>
       <div className="mx-auto max-w-[1180px] px-6 pt-8 max-sm:px-4">
@@ -49,7 +49,7 @@ export default async function StatisticsPage() {
         </div>
       </section>
       </div>
-      <StatisticsDashboard stats={await getStatisticsData()} />
+      <StatisticsDashboard stats={statistics} />
       <MapShortcut />
     </>
   );

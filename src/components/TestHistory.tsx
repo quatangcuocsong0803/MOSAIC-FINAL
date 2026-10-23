@@ -2,16 +2,42 @@
 import type { TestResultItem, PersonalityKind } from "@/app/actions/profile";
 import { confirmTestPersonalityType } from "@/app/actions/profile";
 import { setTestStatisticsConsent } from "@/app/actions/test";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 export default function TestHistory({
-  results,
+  results: initialResults,
+  remote = false,
   onChange,
 }: {
   results: TestResultItem[];
+  remote?: boolean;
   onChange: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<string>(),
     [error, setError] = useState("");
+  const [results, setResults] = useState(initialResults);
+  const [next, setNext] = useState<string>();
+  const [loading, setLoading] = useState(remote);
+  async function load(cursor?: string) {
+    setLoading(true); setError('');
+    try {
+      const response = await fetch(`/api/profile/test-results${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { cache: 'no-store' });
+      if (!response.ok) throw Error('Chưa tải được kết quả test.');
+      const data = await response.json();
+      setResults(previous => cursor ? [...previous, ...data.items] : data.items); setNext(data.next);
+    } catch { setError('Chưa tải được kết quả test.'); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => {
+    if (!remote) { setResults(initialResults); return; }
+    const controller = new AbortController();
+    setLoading(true);
+    fetch('/api/profile/test-results', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (!response.ok) throw Error();
+      const data = await response.json();
+      if (!controller.signal.aborted) { setResults(data.items); setNext(data.next); setLoading(false); }
+    }).catch(() => { if (!controller.signal.aborted) { setError('Chưa tải được kết quả test.'); setLoading(false); } });
+    return () => controller.abort();
+  }, [remote, initialResults]);
   const counts: Record<string, number> = {};
   const numbers: Record<string, number> = {};
   [...results]
@@ -22,7 +48,7 @@ export default function TestHistory({
     )
     .forEach((r) => {
       counts[r.testType] = (counts[r.testType] || 0) + 1;
-      numbers[r.id] = counts[r.testType];
+      numbers[r.id] = r.attemptNumber ?? counts[r.testType];
     });
   const months: Record<string, TestResultItem[]> = {};
   [...results]
@@ -45,6 +71,7 @@ export default function TestHistory({
       const r = await fn();
       if (!r.success) throw Error(r.error || "Chưa cập nhật được.");
       await onChange();
+      if (remote) await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chưa cập nhật được.");
     } finally {
@@ -71,7 +98,8 @@ export default function TestHistory({
           {error}
         </p>
       )}
-      {!results.length && (
+      {loading && !results.length && <p role="status">Đang tải kết quả test…</p>}
+      {!loading && !results.length && (
         <p>
           Bạn chưa có kết quả test.{" "}
           <a className="underline" href="/test">
@@ -181,6 +209,8 @@ export default function TestHistory({
           </div>
         </div>
       ))}
+      {remote && next && <button type="button" className="mosaic-button" disabled={loading} onClick={() => void load(next)}>{loading ? 'Đang tải…' : 'Xem kết quả trước đó'}</button>}
+      {remote && error && <button type="button" className="underline" onClick={() => void load()}>Thử tải lại</button>}
     </section>
   );
 }

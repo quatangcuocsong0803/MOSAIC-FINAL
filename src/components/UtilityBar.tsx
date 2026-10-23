@@ -14,8 +14,6 @@ import { useUser } from "@clerk/nextjs";
 
 import {
   deleteNotification,
-  getNotifications,
-  getUtilityCounts,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/app/actions/notifications";
@@ -224,7 +222,7 @@ export default function UtilityBar() {
       countsBusy.current=accountId;
       const requestedAccount=accountId;
       try {
-        const result=await getUtilityCounts();
+        const result=await fetch('/api/session/counts', { cache: 'no-store' }).then(r => { if (!r.ok) throw Error('Counts unavailable'); return r.json(); });
         if(result.success && requestedAccount===accountRef.current){
           setUnreadNotifications(result.unreadNotifications);
           setUnreadMessages(result.unreadMessages);
@@ -244,7 +242,7 @@ export default function UtilityBar() {
 
       try {
       const result =
-        await getNotifications();
+        await fetch('/api/session/notifications', { cache: 'no-store' }).then(r => { if (!r.ok) throw Error('Notifications unavailable'); return r.json(); });
 
       if (result.success && requestedAccount===accountRef.current) {
         setNotifications(
@@ -267,11 +265,11 @@ export default function UtilityBar() {
       void loadCounts();
       if(notificationOpenRef.current)void loadNotifications();
     };
-    refresh();
+    const initial=window.setTimeout(refresh,1500);
     const interval=window.setInterval(refresh,20_000);
     document.addEventListener('visibilitychange',refresh);
     window.addEventListener('mosaic:utility-refresh',refresh);
-    return ()=>{window.clearInterval(interval);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('mosaic:utility-refresh',refresh)};
+    return ()=>{window.clearTimeout(initial);window.clearInterval(interval);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('mosaic:utility-refresh',refresh)};
   }, [isSignedIn, accountId, loadCounts, loadNotifications]);
 
   useEffect(() => {
@@ -344,9 +342,7 @@ export default function UtilityBar() {
       notification: NotificationItem,
     ) => {
       if (!notification.isRead) {
-        await markNotificationRead(
-          notification.id,
-        );
+        void markNotificationRead(notification.id).then(result => { if (!result.success) void loadNotifications(); }).catch(() => void loadNotifications());
 
         setNotifications(
           (current) =>

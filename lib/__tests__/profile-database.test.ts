@@ -16,7 +16,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: async () => ({ userId: context.clerkId }),
   currentUser: async () => ({ fullName: "Test Member" }),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 const url = process.env.MOSAIC_TEST_DATABASE_URL;
 const { getUserProfile, updateUserProfile, saveTypology } =
   await import("@/app/actions/profile");

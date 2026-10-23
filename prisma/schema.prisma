@@ -127,6 +127,8 @@ model Friendship {
   updatedAt DateTime @updatedAt
 
   @@unique([senderId, receiverId])
+  @@index([senderId, status, createdAt])
+  @@index([receiverId, status, createdAt])
 }
 
 // ============================================================

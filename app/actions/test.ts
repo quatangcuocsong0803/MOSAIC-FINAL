@@ -3,7 +3,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { ensureUser } from "@/lib/ensure-user";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export type TestVariant = "TRADITIONAL_72" | "AI_ADAPTIVE" | "TRADITIONAL";
 
@@ -186,6 +186,7 @@ export async function saveTestResult({
     // 4. Refresh các trang liên quan
     // ========================================================
 
+    revalidateTag("community-statistics");
     revalidatePath("/statistics");
     revalidatePath("/profile");
     revalidatePath("/discover");
@@ -338,6 +339,7 @@ export async function revokeStatisticsConsent(testResultId: string): Promise<{
     // 4. Refresh các trang sử dụng consent
     // ========================================================
 
+    revalidateTag("community-statistics");
     revalidatePath("/statistics");
     revalidatePath("/profile");
     revalidatePath("/discover");
@@ -379,6 +381,7 @@ export async function setTestStatisticsConsent(id: string, consent: boolean) {
           }
         : { statisticsConsent: false, statisticsConsentRevokedAt: new Date() },
     });
+    revalidateTag("community-statistics");
     revalidatePath("/statistics");
     revalidatePath("/profile");
     return { success: result.count === 1 };

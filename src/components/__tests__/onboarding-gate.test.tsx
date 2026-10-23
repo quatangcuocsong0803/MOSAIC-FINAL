@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@clerk/nextjs", () => ({ useUser: () => ({ isLoaded: true, isSignedIn: state.signedIn, user: { id: state.userId } }) }));
 vi.mock("next/navigation", () => ({ usePathname: () => state.path, useRouter: () => ({ replace: state.replace }) }));
-vi.mock("@/app/actions/profile", () => ({ getUserProfile: state.get }));
+vi.mock("@/lib/session-bootstrap", () => ({ getSessionBootstrap: state.get }));
 import OnboardingGate from "../OnboardingGate";
 
 beforeEach(() => {

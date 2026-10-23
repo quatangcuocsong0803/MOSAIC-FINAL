@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
-import { getUserProfile } from "@/app/actions/profile";
+import { getSessionBootstrap } from "@/lib/session-bootstrap";
 import { isOnboardingPath, onboardingPath, onboardingPauseKey } from "@/lib/onboarding";
 import { safeReturnPath } from "@/lib/auth-return";
 
@@ -23,7 +23,7 @@ export default function OnboardingGate() {
     let active = true;
     setError(false);
     setResume(null);
-    getUserProfile().then((result) => {
+    getSessionBootstrap(accountId, retry > 0).then((result) => {
       if (!active) return;
       if (!result.success || !result.profile) { setError(true); return; }
       if (result.profile.onboardingCompletedAt) {

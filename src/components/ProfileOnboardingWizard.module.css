@@ -1,3 +1,7 @@
+.brand {display:flex!important;align-items:center;justify-content:center;width:260px;height:106px;overflow:hidden;background:transparent!important;padding:0!important;}
+.brand img {display:block;width:100%;height:auto;max-width:none;flex:none;}
+.layout {background:rgba(255,253,249,.95)!important;}
+@media(max-width:640px){.brand{width:210px;height:86px}}
 .page {
   position: relative;
   isolation: isolate;
@@ -29,14 +33,14 @@
   background: rgba(255, 248, 226, 0.84);
   border-radius: 8px;
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size:1.5rem;
   letter-spacing: 0.18em;
 }
 .headerNote {
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba(255, 248, 226, 0.84);
-  font-size: 13px;
+  font-size:0.8125rem;
   color: var(--text-muted);
 }
 .layout {
@@ -63,7 +67,7 @@
 }
 .eyebrow {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   letter-spacing: 0.16em;
 }
@@ -76,7 +80,7 @@
 .introText {
   max-width: 320px;
   margin-top: 18px;
-  font-size: 14px;
+  font-size:0.875rem;
   line-height: 1.8;
   color: var(--text-muted);
 }
@@ -91,7 +95,7 @@
   align-items: center;
   gap: 12px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size:0.875rem;
 }
 .steps li > span {
   display: grid;
@@ -100,7 +104,7 @@
   height: 30px;
   border: 1px solid var(--border-light);
   border-radius: 50%;
-  font-size: 11px;
+  font-size:0.6875rem;
 }
 .steps li[aria-current] {
   color: var(--text-primary);
@@ -127,7 +131,7 @@
   gap: 12px;
 }
 .stepHeading > span {
-  font-size: 12px;
+  font-size:0.75rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -160,7 +164,7 @@
 .description {
   margin: 12px 0 28px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size:0.875rem;
   line-height: 1.8;
 }
 .fields {
@@ -213,7 +217,7 @@
   width: 100%;
   min-height: 44px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size:0.8125rem;
   text-decoration: underline;
   text-underline-offset: 4px;
   cursor: pointer;
@@ -228,7 +232,7 @@
   .headerNote {
     max-width: 145px;
     text-align: right;
-    font-size: 11px;
+    font-size:0.6875rem;
   }
   .layout {
     grid-template-columns: minmax(0, 1fr);
