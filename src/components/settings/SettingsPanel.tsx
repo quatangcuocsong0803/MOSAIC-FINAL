@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SignOutButton, useClerk } from '@clerk/nextjs';
 import type { UserProfileData } from '@/app/actions/profile';
 import { getUserSettings, saveUserSettings } from '@/app/actions/settings';
@@ -26,6 +26,22 @@ export default function SettingsPanel({ initialProfile, initialSettings, clerkId
   const [error, setError] = useState(false);
   const [conflict, setConflict] = useState(false);
   const { openUserProfile } = useClerk();
+  const savedRef = useRef(saved);
+  useEffect(() => { savedRef.current = saved; }, [saved]);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.textSize = draft.textSize;
+    root.dataset.reducedMotion = String(draft.reducedMotion);
+    root.dataset.showDecorations = String(draft.showDecorations);
+    window.dispatchEvent(new Event('mosaic-display-changed'));
+  }, [draft.textSize, draft.reducedMotion, draft.showDecorations]);
+  useEffect(() => () => {
+    const root = document.documentElement;
+    root.dataset.textSize = savedRef.current.textSize;
+    root.dataset.reducedMotion = String(savedRef.current.reducedMotion);
+    root.dataset.showDecorations = String(savedRef.current.showDecorations);
+    window.dispatchEvent(new Event('mosaic-display-changed'));
+  }, []);
   const dirty = JSON.stringify(draft) !== JSON.stringify(preferencesOnly(saved));
   function change<K extends keyof Preferences>(key: K, value: Preferences[K]) { setDraft(current => ({ ...current, [key]: value })); setMessage(''); }
   async function save() {

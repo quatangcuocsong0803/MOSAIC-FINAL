@@ -492,6 +492,10 @@ html[data-reduced-motion="true"] a:hover, html[data-reduced-motion="true"] artic
 .mosaic-editorial-canvas {background-image:url('/home/editorial-floral-tile.jpg');background-size:713.5px 551px;}
 .mosaic-editorial-canvas .mosaic-editorial-page {background:none;padding:0;min-height:0;}
 .mosaic-profile-card {width:100%;max-width:none;border:1px solid #cfb77e;border-radius:20px;background:var(--mosaic-paper,rgba(248,245,238,.70));padding:24px;box-shadow:0 4px 18px #5c43260c;color:#5c4326;}
+.mosaic-profile-canvas {--mosaic-paper:rgba(251,249,244,.82);}
+.mosaic-profile-canvas .mosaic-profile-card {background:rgba(255,253,249,.96);border-color:#d6c9ae;}
+.mosaic-profile-page .text-sm,.mosaic-discussion-content .text-sm {font-size:1rem;line-height:1.6;}
+.mosaic-profile-page .text-xs,.mosaic-discussion-content .text-xs {font-size:.875rem;line-height:1.5;}
 .mosaic-button {border:1px solid #795737;border-radius:12px;background:#805d3b;color:#fffaf0;padding:10px 18px;font-weight:600;cursor:pointer;transition:background .15s;}
 .mosaic-button:hover {background:#67482e;}
 .mosaic-button:disabled {opacity:.55;cursor:wait;}

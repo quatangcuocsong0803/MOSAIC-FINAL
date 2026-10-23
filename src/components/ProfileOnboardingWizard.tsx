@@ -19,6 +19,9 @@ import { ONBOARDING_STEPS, onboardingPauseKey } from "@/lib/onboarding";
 import LocationPicker from "./LocationPicker";
 import { onboardingDraftKey, stepError } from "@/lib/onboarding-draft";
 import { notifyAvatarUpdated } from "@/lib/avatar-events";
+import { clearSessionBootstrap } from '@/lib/session-bootstrap';
+import { prepareAvatar } from '@/lib/avatar/prepare';
+import { uploadResponse } from '@/lib/upload-response';
 const fieldClass =
   "mt-2 w-full rounded-xl border border-[#E2D4B7] bg-[#FAF8F5] p-3 text-[#5C4326]";
 const descriptions = [
@@ -129,12 +132,12 @@ export default function ProfileOnboardingWizard({
     try {
       if (avatarFile) {
         const body = new FormData();
-        body.set("avatar", avatarFile);
+        body.set("avatar", await prepareAvatar(avatarFile));
         const response = await fetch("/api/profile/avatar", {
           method: "POST",
           body,
         });
-        const uploaded = await response.json();
+        const uploaded = await uploadResponse<{ error?: string; avatarUrl: string }>(response);
         if (!response.ok) throw Error(uploaded.error);
         notifyAvatarUpdated(uploaded.avatarUrl);
         setAvatarFile(undefined);
@@ -152,6 +155,7 @@ export default function ProfileOnboardingWizard({
         return;
       }
       try {
+        clearSessionBootstrap();
         localStorage.removeItem(onboardingDraftKey(profile.clerkId));
         if (direction === "save")
           sessionStorage.setItem(onboardingPauseKey(profile.clerkId), "1");
@@ -200,9 +204,8 @@ export default function ProfileOnboardingWizard({
       <OnboardingSceneDecorations step={step} />
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="MOSAIC — trang chủ">
-          MOSAIC
+          <img src="/figma-home/logo-combined.png" alt="MOSAIC" width={1536} height={1024} />
         </Link>
-        <span className={styles.headerNote}>Mảnh ghép đầu tiên của bạn</span>
       </header>
       <div className={styles.layout}>
         <OnboardingFrameOrnaments />

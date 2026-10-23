@@ -7,7 +7,7 @@ import {
   type UpdateUserProfileInput,
 } from "./profile";
 import { onboardingMove } from "@/lib/onboarding";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 export async function saveOnboardingStep(
   step: number,
   direction: "next" | "back" | "save",
@@ -89,6 +89,7 @@ export async function saveOnboardingStep(
         success: false as const,
         error: "Tiến độ đã thay đổi. Hãy tải lại trang.",
       };
+    revalidateTag("community-statistics");
     revalidatePath("/profile");
     revalidatePath("/onboarding", "layout");
     return getUserProfile();
@@ -131,6 +132,7 @@ export async function saveOnboardingDraft(
         },
       });
     });
+    revalidateTag("community-statistics");
     revalidatePath("/profile");
     return getUserProfile();
   } catch (e) {

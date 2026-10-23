@@ -2,7 +2,7 @@
 
 import { monthlyResults, personalityPairs, type MonthlyPoint, type PersonalityPair } from "@/lib/statistics/aggregate";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import {
   ZODIAC_SIGNS,
   ZODIAC_ICONS,
@@ -327,7 +327,9 @@ function getMostFrequent(
  *    Profile dùng cho phân tích/filter:
  *    chỉ dùng khi result có consent.
  */
-export async function getStatisticsData(): Promise<StatisticsData> {
+const cachedStatisticsData = unstable_cache(calculateStatisticsData, ['community-statistics-v2'], { revalidate: 60, tags: ['community-statistics'] });
+export async function getStatisticsData(): Promise<StatisticsData> { return cachedStatisticsData(); }
+async function calculateStatisticsData(): Promise<StatisticsData> {
   try {
     // Read only fields used by aggregation, and only currently shared results.
     const [totalUsers, testedUsersCount, totalTestsCompleted, allUsers] = await Promise.all([
@@ -1220,6 +1222,7 @@ export async function seedTestResults(): Promise<{
       }
     }
 
+    revalidateTag("community-statistics");
     revalidatePath(
       "/statistics"
     );
@@ -1272,6 +1275,7 @@ export async function clearTestResults(): Promise<{
     const deleted =
       await prisma.testResult.deleteMany();
 
+    revalidateTag("community-statistics");
     revalidatePath(
       "/statistics"
     );

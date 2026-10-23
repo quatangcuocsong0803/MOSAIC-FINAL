@@ -1,7 +1,7 @@
 "use server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import {
   activeIdentityConsent,
   identitySnapshot,
@@ -81,6 +81,7 @@ export async function setIdentityConsent(
           data: { revokedAt: new Date() },
         });
     });
+    revalidateTag('community-statistics');
     revalidatePath("/statistics");
     revalidatePath("/profile");
     return { success: true };
@@ -91,7 +92,9 @@ export async function setIdentityConsent(
     };
   }
 }
-export async function getConfirmedIdentityStatistics() {
+const cachedIdentityStatistics = unstable_cache(calculateIdentityStatistics, ['confirmed-identity-statistics-v2'], { revalidate: 60, tags: ['community-statistics'] });
+export async function getConfirmedIdentityStatistics() { return cachedIdentityStatistics(); }
+async function calculateIdentityStatistics() {
   const rows = await prisma.identityStatisticsConsent.findMany({
     where: { revokedAt: null },
     include: {

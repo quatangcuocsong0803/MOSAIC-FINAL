@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import styles from "./Navbar.module.css";
 import { SignOutButton, useUser } from "@clerk/nextjs";
-import { getNavigationAvatar } from "@/app/actions/navigation";
+import { getSessionBootstrap, clearSessionBootstrap } from "@/lib/session-bootstrap";
+import InteractionDrawer from './InteractionDrawer';
 import { AVATAR_UPDATED_EVENT } from "@/lib/avatar-events";
 import UtilityBar from "./UtilityBar";
 import DiscussionDropdown, { discussionLinks } from "./DiscussionDropdown";
@@ -29,6 +30,17 @@ const navItems = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const prefetched = useRef(new Map<string, number>());
+  function prepareNavigation(target: EventTarget | null) {
+    const anchor = target instanceof Element ? target.closest('a[href]') : null;
+    if (!(anchor instanceof HTMLAnchorElement) || anchor.origin !== window.location.origin) return;
+    if (!['/test', '/discover', '/discussion', '/knowledge', '/statistics', '/profile'].includes(anchor.pathname)) return;
+    const href = anchor.pathname + anchor.search;
+    if ((prefetched.current.get(href) ?? 0) > Date.now()) return;
+    prefetched.current.set(href, Date.now() + 30_000);
+    router.prefetch(href);
+  }
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -50,12 +62,13 @@ export default function Navbar() {
   useEffect(() => {
     let alive=true;let revision=0;
     setAvatarUrl(null);
-    if(!isSignedIn || !accountId)return;
+    if(!isSignedIn || !accountId){clearSessionBootstrap();return;}
     const loadAvatar=async()=>{
       const request=++revision;
-      try{const result=await getNavigationAvatar();if(alive&&request===revision&&result.success)setAvatarUrl(result.avatarUrl);}catch{}
+      try{const result=await getSessionBootstrap(accountId);if(alive&&request===revision&&result.success)setAvatarUrl(result.avatarUrl);}catch{}
     };
     const onAvatarUpdated=(event:Event)=>{
+      clearSessionBootstrap();
       const url=(event as CustomEvent<string|null>).detail;
       if(url!==undefined){++revision;setAvatarUrl(url);}else void loadAvatar();
     };
@@ -97,6 +110,8 @@ export default function Navbar() {
       <nav
         className={styles.nav}
         aria-label="Primary navigation"
+        onMouseOver={event => prepareNavigation(event.target)}
+        onFocus={event => prepareNavigation(event.target)}
       >
         <Link
           href="/"
@@ -466,6 +481,7 @@ export default function Navbar() {
           )}
         </div>
 
+        <InteractionDrawer />
         <button
           type="button"
           ref={menuRef}

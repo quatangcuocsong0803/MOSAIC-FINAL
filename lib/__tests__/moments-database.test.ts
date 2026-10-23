@@ -29,7 +29,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: async () => ({ userId: state.clerkId }),
   currentUser: async () => ({ fullName: "QA" }),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 vi.mock("@/lib/supabase-admin", () => ({
   getSupabaseAdmin: () => ({
     storage: {
@@ -55,6 +55,9 @@ import {
 import { setTestStatisticsConsent } from "@/app/actions/test";
 import { getFriendProfile } from "@/app/actions/friends";
 import { GET as mediaGET } from "@/app/api/profile/moments/media/[id]/route";
+import { friendsSummary } from '@/lib/friends-summary';
+import { getOwnerProfileSummary } from '@/app/actions/profile';
+import { GET as testHistoryGET } from '@/app/api/profile/test-results/route';
 const url = process.env.MOSAIC_FEATURE_TEST_DATABASE_URL;
 describe.skipIf(!url)(
   "local PostgreSQL moments, checkpoint and independent consents",
@@ -98,6 +101,32 @@ describe.skipIf(!url)(
     afterAll(async () => {
       await db.user.deleteMany({ where: { clerkId: { startsWith: prefix } } });
       await db.$disconnect();
+    });
+    it('returns actual mutual counts and respects blocks and identity privacy', async () => {
+      await db.friendship.createMany({ data: [
+        { senderId: owner, receiverId: stranger, status: 'ACCEPTED' },
+        { senderId: friend, receiverId: stranger, status: 'ACCEPTED' },
+      ] });
+      await db.user.update({ where: { id: friend }, data: { displayName: 'Hidden', username: 'hidden_friend', avatarUrl: 'https://example.com/private.png', displayNameVisibility: 'PRIVATE', usernameVisibility: 'PRIVATE', avatarUrlVisibility: 'PRIVATE' } });
+      const first = await friendsSummary();
+      expect(first.users.find(u => u.id === friend)).toEqual({ id: friend, username: null, avatarUrl: null, mutualCount: 1 });
+      await db.userBlock.create({ data: { blockerId: friend, blockedId: stranger } });
+      expect((await friendsSummary()).users.find(u => u.id === friend)?.mutualCount).toBe(0);
+      await db.userBlock.create({ data: { blockerId: stranger, blockedId: owner } });
+      expect((await friendsSummary()).users.map(u => u.id)).toEqual([friend]);
+    });
+    it('loads a light owner summary and paginates attempts without answer details or cross-account access', async () => {
+      await db.testResult.createMany({ data: Array.from({ length: 25 }, (_, i) => ({ id: `history-owner-${i}`, userId: owner, testType: 'MBTI', resultName: 'INFP', details: 'private answers', createdAt: new Date(Date.UTC(2026, 0, i + 1)) })) });
+      await db.testResult.create({ data: { id: 'foreign-history', userId: stranger, testType: 'MBTI', resultName: 'ENTJ' } });
+      const summary = await getOwnerProfileSummary();
+      expect(summary.success).toBe(true); expect(summary.profile?.testResults).toEqual([]);
+      const page = await (await testHistoryGET(new Request('https://mosaic.test/api/profile/test-results'))).json();
+      expect(page.items).toHaveLength(20); expect(page.items[0].attemptNumber).toBe(25); expect(page.items[19].attemptNumber).toBe(6); expect(page.items.every((r: { details: unknown }) => r.details === null)).toBe(true);
+      const second = await (await testHistoryGET(new Request(`https://mosaic.test/api/profile/test-results?cursor=${page.next}`))).json();
+      expect(second.items).toHaveLength(5); expect(second.items[4].attemptNumber).toBe(1); expect(second.next).toBeUndefined();
+      expect((await testHistoryGET(new Request('https://mosaic.test/api/profile/test-results?cursor=foreign-history'))).status).toBe(400);
+      state.clerkId = null;
+      expect((await testHistoryGET(new Request('https://mosaic.test/api/profile/test-results'))).status).toBe(401);
     });
     it("rejects invalid final drafts and duplicate usernames without partial writes", async () => {
       expect(

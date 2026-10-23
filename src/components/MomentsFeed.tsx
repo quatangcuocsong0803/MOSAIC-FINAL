@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import {
   createMoment,
   deleteMoment,
-  listMoments,
   updateMomentVisibility,
 } from "@/app/actions/moments";
 import type { ProfileVisibility } from "@prisma/client";
-type Page = Awaited<ReturnType<typeof listMoments>>;
+type Page = Awaited<ReturnType<typeof import('@/app/actions/moments').listMoments>>;
+async function listMoments(ownerId: string, cursor?: string): Promise<Page> {
+  const query = new URLSearchParams({ ownerId, ...(cursor ? { cursor } : {}) });
+  const response = await fetch(`/api/profile/moments?${query}`, { cache: 'no-store' });
+  if (!response.ok) throw Error('Chưa tải được Khoảnh khắc.');
+  return response.json();
+}
 const labels = { PUBLIC: "Công khai", FRIENDS: "Bạn bè", PRIVATE: "Riêng tư" };
 export default function MomentsFeed({
   ownerId,
@@ -105,7 +110,7 @@ export default function MomentsFeed({
     }
   }
   return (
-    <section
+    <section id="moments"
       className="mosaic-profile-card space-y-5"
       aria-labelledby="moments-title"
     >

@@ -2,7 +2,7 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import {
   birthFacts,
   PRIVATE_FIELDS,
@@ -22,6 +22,7 @@ import {
   ENNEAGRAM_WINGS,
 } from "@/lib/personality-validation";
 import { ensureUser } from "@/lib/ensure-user";
+import { activeIdentityConsent } from "@/lib/identity-consent";
 
 export interface UpdateUserProfileInput {
   username?: string | null;
@@ -37,6 +38,7 @@ export interface UpdateUserProfileInput {
 }
 
 export interface TestResultItem {
+  attemptNumber?: number;
   id: string;
   testType: string;
   testVariant: string | null;
@@ -98,6 +100,7 @@ export interface UserProfileData {
   confirmedEnneagramSource: string | null;
   confirmedEnneagramTestResultId: string | null;
 
+  identityConsents?: { MBTI: boolean; ENNEAGRAM: boolean };
   testResults: TestResultItem[];
 }
 
@@ -114,18 +117,19 @@ export interface ConfirmTestPersonalityTypeInput {
   testResultId: string;
 }
 
-async function getOrCreateCurrentUser(clerkId: string) {
+async function getOrCreateCurrentUser(clerkId: string, history = true) {
   let user = await prisma.user.findUnique({
     where: {
       clerkId,
     },
 
     include: {
-      testResults: {
+      identityConsents: true,
+      testResults: history ? {
         orderBy: {
           createdAt: "desc",
         },
-      },
+      } : false,
     },
   });
 
@@ -137,7 +141,7 @@ async function getOrCreateCurrentUser(clerkId: string) {
   await ensureUser(clerkId, clerkUser?.fullName);
   user = await prisma.user.findUniqueOrThrow({
     where: { clerkId },
-    include: { testResults: { orderBy: { createdAt: "desc" } } },
+    include: { identityConsents: true, testResults: history ? { orderBy: { createdAt: "desc" } } : false },
   });
 
   return user;
@@ -195,11 +199,16 @@ function serializeUserProfile(user: any): UserProfileData {
 
     confirmedEnneagramTestResultId: user.confirmedEnneagramTestResultId ?? null,
 
+    identityConsents: {
+      MBTI: Boolean(user.identityConsents?.some((c: Parameters<typeof activeIdentityConsent>[1] & { kind: string }) => c.kind === 'MBTI' && activeIdentityConsent(user, c))),
+      ENNEAGRAM: Boolean(user.identityConsents?.some((c: Parameters<typeof activeIdentityConsent>[1] & { kind: string }) => c.kind === 'ENNEAGRAM' && activeIdentityConsent(user, c))),
+    },
     testResults: user.testResults || [],
   };
 }
 
 function revalidatePersonalityPaths() {
+  revalidateTag('community-statistics');
   revalidatePath("/");
   revalidatePath("/profile");
   revalidatePath("/discover");
@@ -209,6 +218,14 @@ function revalidatePersonalityPaths() {
 /**
  * Lấy profile của user hiện tại.
  */
+export async function getOwnerProfileSummary() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { success: false, profile: undefined };
+    return { success: true, profile: serializeUserProfile(await getOrCreateCurrentUser(userId, false)) };
+  } catch { return { success: false, profile: undefined }; }
+}
+
 export async function getUserProfile(): Promise<{
   success: boolean;
   profile?: UserProfileData | null;

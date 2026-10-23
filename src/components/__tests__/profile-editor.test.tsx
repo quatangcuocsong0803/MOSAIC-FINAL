@@ -15,6 +15,7 @@ vi.mock("@/app/actions/profile", () => ({
   updateUserProfile: mocks.update,
   saveTypology: mocks.types,
 }));
+vi.mock('@/lib/avatar/prepare', () => ({ prepareAvatar: async (file: File) => file }));
 import ProfileFormModal from "../ProfileFormModal";
 beforeEach(() => {
   vi.clearAllMocks();
@@ -77,6 +78,7 @@ it("uploads an avatar through the authenticated endpoint", async () => {
     .fn()
     .mockResolvedValue({
       ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
       json: async () => ({ avatarUrl: "https://example.com/new-avatar.png" }),
     });
   vi.stubGlobal("fetch", fetchMock);

@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { getUserSettings } from '@/app/actions/settings';
+import { getSessionBootstrap, clearSessionBootstrap } from '@/lib/session-bootstrap';
 import { defaultPreferences, SETTINGS_EVENT, type SettingsSnapshot } from '@/lib/settings/preferences';
 export function announceSettings(userId: string, settings: SettingsSnapshot) {
+  clearSessionBootstrap();
   window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: { userId, settings } }));
   try { localStorage.setItem(`mosaic-settings-signal:${userId}`, `${settings.revision}:${Date.now()}`); } catch { /* Preferences still work without storage. */ }
 }
@@ -23,19 +24,23 @@ export default function DisplayPreferences() {
     };
     const reload = async () => {
       const current = ++request;
-      const result = await getUserSettings();
+      if (!userId) return;
+      const result = await getSessionBootstrap(userId);
       if (alive && current === request && result.success) apply(result.settings);
     };
     if (previousUserId.current !== userId || !userId) apply();
     previousUserId.current = userId;
     if (!userId) apply();
-    else if (isLoaded) void reload();
+    else if (isLoaded) void reload().catch(() => {});
     const onSaved = (event: Event) => {
       const detail = (event as CustomEvent<{ userId: string; settings: SettingsSnapshot }>).detail;
       if (detail?.userId === userId) { ++request; apply(detail.settings); }
     };
     const onStorage = (event: StorageEvent) => {
-      if (userId && event.key === `mosaic-settings-signal:${userId}`) void reload();
+      if (userId && event.key === `mosaic-settings-signal:${userId}`) {
+        clearSessionBootstrap();
+        void reload().catch(() => {});
+      }
     };
     window.addEventListener(SETTINGS_EVENT, onSaved);
     window.addEventListener('storage', onStorage);

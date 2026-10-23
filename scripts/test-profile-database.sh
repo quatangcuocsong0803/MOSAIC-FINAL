@@ -24,7 +24,7 @@ INSERT INTO "User" (id,"clerkId",username,"createdAt","dateOfBirth",hobbies) VAL
 ('old-a','legacy-a','same','2020-01-01','1992-03-21','Reading'),
 ('old-c','legacy-c','third','2020-02-01',NULL,NULL);
 SQL
-for migration in prisma/migrations/20261009000*/migration.sql prisma/migrations/202610220001_profile_moments_consents/migration.sql; do
+for migration in prisma/migrations/20261009000*/migration.sql prisma/migrations/202610220001_profile_moments_consents/migration.sql prisma/migrations/202610230001_friendship_lookup_indexes/migration.sql; do
   docker_local exec -i "$mosaic_test_container" psql -v ON_ERROR_STOP=1 -U postgres -d mosaic_legacy < "$migration" >/dev/null
 done
 MOSAIC_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$mosaic_test_port/mosaic_legacy" MOSAIC_FEATURE_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$mosaic_test_port/mosaic_legacy" npx vitest run lib/__tests__/profile-database.test.ts lib/__tests__/moments-database.test.ts
