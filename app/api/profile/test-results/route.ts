@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     const user = await prisma.user.findUnique({ where: { clerkId: userId }, select: { id: true } });
     if (!user) return Response.json({ items: [] }, { headers: { 'Cache-Control': 'private, no-store' } });
-    const anchor = cursor ? await prisma.testResult.findFirst({ where: { id: cursor, userId: user.id }, select: { id: true, createdAt: true } }) : null;
+    const anchor = cursor ? await prisma.testResult.findFirst({ where: { id: cursor, userId: user.id }, select: { id: true } }) : null;
     if (cursor && !anchor) return Response.json({ error: 'Mốc lịch sử không hợp lệ.' }, { status: 400 });
     const rows = await prisma.$queryRaw<Array<Record<string, unknown> & { id: string; attemptNumber: bigint }>>(Prisma.sql`
       SELECT * FROM (
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
           "statisticsConsent", "statisticsConsentVersion", "statisticsConsentedAt", "statisticsConsentRevokedAt", "createdAt",
           ROW_NUMBER() OVER (PARTITION BY "testType" ORDER BY "createdAt", id) AS "attemptNumber"
         FROM "TestResult" WHERE "userId" = ${user.id}
-      ) history ${anchor ? Prisma.sql`WHERE ("createdAt", id) < (${anchor.createdAt}, ${anchor.id})` : Prisma.empty}
+      ) history ${anchor ? Prisma.sql`WHERE ("createdAt", id) < (SELECT "createdAt", id FROM "TestResult" WHERE id = ${anchor.id} AND "userId" = ${user.id})` : Prisma.empty}
       ORDER BY "createdAt" DESC, id DESC LIMIT 21
     `);
     return Response.json({ items: rows.slice(0,20).map(row => ({ ...row, attemptNumber: Number(row.attemptNumber) })), next: rows.length > 20 ? rows[19].id : undefined }, { headers: { 'Cache-Control': 'private, no-store' } });
